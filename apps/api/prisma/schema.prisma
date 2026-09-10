@@ -1,0 +1,472 @@
+// BENSKIN IMPACT — schéma de données (phases 2 à 4 : identité, RBAC, audit, ledger, wallet, idempotence).
+// Conventions : UUID, snake_case en base, created_at/updated_at, montants en NUMERIC (jamais de float).
+// Les garanties d'intégrité financière (immutabilité, équilibre débit/crédit) sont renforcées
+// par des triggers PostgreSQL dans la migration `ledger_integrity`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────── Identité ───────────────────────────────
+
+enum UserKind {
+  MEMBER // conducteur / bénéficiaire / entrepreneur (application mobile)
+  STAFF // back-office
+}
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+  LOCKED
+  CLOSED
+}
+
+enum KycStatus {
+  NOT_STARTED
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id               String     @id @default(uuid()) @db.Uuid
+  phone            String     @unique // format E.164, ex. +237612345678
+  kind             UserKind   @default(MEMBER)
+  status           UserStatus @default(PENDING_VERIFICATION)
+  pinHash          String?    @map("pin_hash")
+  failedLoginCount Int        @default(0) @map("failed_login_count")
+  lockedUntil      DateTime?  @map("locked_until")
+  phoneVerifiedAt  DateTime?  @map("phone_verified_at")
+  lastLoginAt      DateTime?  @map("last_login_at")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  deletedAt        DateTime?  @map("deleted_at")
+
+  profile    Profile?
+  roles      UserRole[]
+  sessions   Session[]
+  devices    Device[]
+  consents   Consent[]
+  wallet     Wallet?
+  kycProfile KycProfile?
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model Profile {
+  userId    String    @id @map("user_id") @db.Uuid
+  firstName String    @map("first_name")
+  lastName  String    @map("last_name")
+  city      String
+  zone      String?
+  avatarKey String?   @map("avatar_key")
+  kycStatus KycStatus @default(NOT_STARTED) @map("kyc_status")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([city])
+  @@index([kycStatus])
+  @@map("profiles")
+}
+
+model Consent {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  type       String // TERMS, PRIVACY, PROGRAM_RULES
+  version    String
+  acceptedAt DateTime @default(now()) @map("accepted_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, type, version])
+  @@map("consents")
+}
+
+// ─────────────────────────────── KYC ───────────────────────────────
+// Circuit : NOT_STARTED → DRAFT → SUBMITTED → UNDER_REVIEW → APPROVED | REJECTED | DRAFT (complément demandé).
+// profiles.kyc_status reste un miroir de kyc_profiles.status, mis à jour dans la même transaction.
+
+enum KycIdDocumentType {
+  CNI // carte nationale d'identité
+  PASSPORT
+  RECEIPT // récépissé de demande de CNI
+}
+
+enum KycDocumentType {
+  ID_FRONT
+  ID_BACK
+  SELFIE
+  VEHICLE_REGISTRATION
+  DRIVING_LICENSE
+}
+
+enum KycDocumentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  REPLACED
+}
+
+enum KycReviewDecision {
+  APPROVED
+  REJECTED
+  MORE_INFO_REQUESTED
+}
+
+enum VehicleOwnership {
+  OWNER
+  RENTED
+  THIRD_PARTY
+}
+
+model KycProfile {
+  id                 String             @id @default(uuid()) @db.Uuid
+  userId             String             @unique @map("user_id") @db.Uuid
+  status             KycStatus          @default(DRAFT)
+  firstName          String?            @map("first_name")
+  lastName           String?            @map("last_name")
+  birthDate          DateTime?          @map("birth_date") @db.Date
+  idDocumentType     KycIdDocumentType? @map("id_document_type")
+  idDocumentNumber   String?            @map("id_document_number")
+  idDocumentExpiry   DateTime?          @map("id_document_expiry") @db.Date
+  city               String?
+  district           String?
+  addressHint        String?            @map("address_hint")
+  vehiclePlate       String?            @map("vehicle_plate")
+  vehicleModel       String?            @map("vehicle_model")
+  vehicleOwnership   VehicleOwnership?  @map("vehicle_ownership")
+  submissionCount    Int                @default(0) @map("submission_count")
+  submittedAt        DateTime?          @map("submitted_at")
+  reviewerId         String?            @map("reviewer_id") @db.Uuid
+  reviewStartedAt    DateTime?          @map("review_started_at")
+  reviewedAt         DateTime?          @map("reviewed_at")
+  /// Motif visible par le membre (refus ou complément demandé).
+  lastDecisionReason String?            @map("last_decision_reason")
+  riskFlags          String[]           @default([]) @map("risk_flags")
+  providerName       String?            @map("provider_name")
+  providerReference  String?            @map("provider_reference")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  documents KycDocument[]
+  reviews   KycReview[]
+
+  @@index([status, submittedAt])
+  @@index([idDocumentNumber])
+  @@map("kyc_profiles")
+}
+
+model KycDocument {
+  id              String            @id @default(uuid()) @db.Uuid
+  kycProfileId    String            @map("kyc_profile_id") @db.Uuid
+  type            KycDocumentType
+  status          KycDocumentStatus @default(PENDING)
+  /// Clé opaque du fichier chiffré (AES-256-GCM) dans le stockage privé.
+  storageKey      String            @unique @map("storage_key")
+  mimeType        String            @map("mime_type")
+  sizeBytes       Int               @map("size_bytes")
+  sha256          String
+  scanStatus      String            @default("NOT_SCANNED") @map("scan_status")
+  rejectionReason String?           @map("rejection_reason")
+  uploadedById    String            @map("uploaded_by_id") @db.Uuid
+  createdAt       DateTime          @default(now()) @map("created_at")
+  replacedAt      DateTime?         @map("replaced_at")
+
+  kycProfile KycProfile @relation(fields: [kycProfileId], references: [id], onDelete: Restrict)
+
+  @@index([kycProfileId, type])
+  @@map("kyc_documents")
+}
+
+/// Historique immuable des décisions (UPDATE/DELETE bloqués par trigger).
+model KycReview {
+  id               String            @id @default(uuid()) @db.Uuid
+  kycProfileId     String            @map("kyc_profile_id") @db.Uuid
+  reviewerId       String            @map("reviewer_id") @db.Uuid
+  decision         KycReviewDecision
+  reason           String?
+  internalNotes    String?           @map("internal_notes")
+  submissionNumber Int               @map("submission_number")
+  documentDecisions Json?            @map("document_decisions")
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  kycProfile KycProfile @relation(fields: [kycProfileId], references: [id], onDelete: Restrict)
+
+  @@index([kycProfileId, createdAt])
+  @@map("kyc_reviews")
+}
+
+// ─────────────────────────────── RBAC ───────────────────────────────
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique // SUPER_ADMIN, ADMIN, FINANCE, OPS, COMPLIANCE, PROGRAM, RISK, CLAIMS, MEMBER
+  name        String
+  description String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique // ex. wallet.read.self, admin.drivers.read
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId    String   @map("user_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  grantedBy String?  @map("granted_by") @db.Uuid
+  grantedAt DateTime @default(now()) @map("granted_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+// ─────────────────────────────── Sessions & appareils ───────────────────────────────
+
+model Device {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  installationId String    @map("installation_id") // UUID généré par l'application
+  platform       String // android, web, ios
+  model          String?
+  appVersion     String?   @map("app_version")
+  lastSeenAt     DateTime  @default(now()) @map("last_seen_at")
+  revokedAt      DateTime? @map("revoked_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  sessions Session[]
+
+  @@unique([userId, installationId])
+  @@map("devices")
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  deviceId         String?   @map("device_id") @db.Uuid
+  familyId         String    @map("family_id") @db.Uuid // chaîne de rotation des refresh tokens
+  refreshTokenHash String    @unique @map("refresh_token_hash") // SHA-256, jamais le token en clair
+  expiresAt        DateTime  @map("expires_at")
+  revokedAt        DateTime? @map("revoked_at")
+  revokedReason    String?   @map("revoked_reason") // ROTATED, LOGOUT, REUSE_DETECTED, ADMIN, DEVICE_REVOKED
+  replacedById     String?   @map("replaced_by_id") @db.Uuid
+  ipHash           String?   @map("ip_hash")
+  userAgent        String?   @map("user_agent")
+  lastUsedAt       DateTime  @default(now()) @map("last_used_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  device Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("sessions")
+}
+
+enum OtpPurpose {
+  REGISTER
+  PIN_RESET
+}
+
+model OtpChallenge {
+  id          String     @id @default(uuid()) @db.Uuid
+  phone       String
+  purpose     OtpPurpose
+  codeHash    String     @map("code_hash") // HMAC-SHA256
+  attempts    Int        @default(0)
+  maxAttempts Int        @map("max_attempts")
+  expiresAt   DateTime   @map("expires_at")
+  consumedAt  DateTime?  @map("consumed_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  @@index([phone, purpose, createdAt])
+  @@map("otp_challenges")
+}
+
+// ─────────────────────────────── Audit ───────────────────────────────
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  actorId      String?  @map("actor_id") @db.Uuid
+  actorType    String   @map("actor_type") // MEMBER, STAFF, SYSTEM
+  action       String // ex. auth.login.succeeded, ledger.transaction.posted
+  resourceType String   @map("resource_type")
+  resourceId   String?  @map("resource_id")
+  before       Json?
+  after        Json?
+  metadata     Json?
+  requestId    String?  @map("request_id")
+  ipHash       String?  @map("ip_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([actorId])
+  @@index([resourceType, resourceId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─────────────────────────────── Ledger en partie double ───────────────────────────────
+
+enum LedgerAccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum EntryDirection {
+  DEBIT
+  CREDIT
+}
+
+model LedgerAccount {
+  id            String            @id @default(uuid()) @db.Uuid
+  code          String            @unique // ex. member:<uuid>:available, system:provider_clearing:sandbox
+  name          String
+  type          LedgerAccountType
+  purpose       String // MEMBER_AVAILABLE, MEMBER_RESERVED, PROVIDER_CLEARING, CONTRIBUTION_POOL, FEES_REVENUE…
+  currency      String            @default("XAF") @db.Char(3)
+  ownerUserId   String?           @map("owner_user_id") @db.Uuid
+  // Solde dans le sens normal du compte (crédit pour LIABILITY/EQUITY/REVENUE, débit pour ASSET/EXPENSE).
+  // Cache contrôlé : modifié uniquement par LedgerService dans la même transaction que les écritures,
+  // vérifiable à tout moment par recalcul depuis ledger_entries.
+  balance       Decimal           @default(0) @db.Decimal(20, 2)
+  allowNegative Boolean           @default(false) @map("allow_negative")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  entries LedgerEntry[]
+
+  @@index([ownerUserId])
+  @@index([purpose])
+  @@map("ledger_accounts")
+}
+
+model LedgerTransaction {
+  id           String   @id @default(uuid()) @db.Uuid
+  reference    String   @unique // référence métier idempotente : un même mouvement ne peut être posté deux fois
+  type         String // DEPOSIT, CONTRIBUTION, ASSISTANCE, REVERSAL…
+  description  String?
+  currency     String   @db.Char(3)
+  reversalOfId String?  @unique @map("reversal_of_id") @db.Uuid
+  metadata     Json?
+  createdById  String?  @map("created_by_id") @db.Uuid
+  postedAt     DateTime @default(now()) @map("posted_at")
+
+  reversalOf LedgerTransaction?  @relation("Reversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy LedgerTransaction?  @relation("Reversal")
+  entries    LedgerEntry[]
+
+  @@index([type])
+  @@index([postedAt])
+  @@map("ledger_transactions")
+}
+
+model LedgerEntry {
+  id            String         @id @default(uuid()) @db.Uuid
+  transactionId String         @map("transaction_id") @db.Uuid
+  accountId     String         @map("account_id") @db.Uuid
+  direction     EntryDirection
+  amount        Decimal        @db.Decimal(20, 2)
+  currency      String         @db.Char(3)
+  balanceAfter  Decimal        @map("balance_after") @db.Decimal(20, 2)
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  transaction LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  account     LedgerAccount     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([accountId, createdAt])
+  @@index([transactionId])
+  @@map("ledger_entries")
+}
+
+// ─────────────────────────────── Wallet ───────────────────────────────
+
+enum WalletStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
+}
+
+model Wallet {
+  id                 String       @id @default(uuid()) @db.Uuid
+  userId             String       @unique @map("user_id") @db.Uuid
+  currency           String       @default("XAF") @db.Char(3)
+  status             WalletStatus @default(ACTIVE)
+  availableAccountId String       @unique @map("available_account_id") @db.Uuid
+  reservedAccountId  String       @unique @map("reserved_account_id") @db.Uuid
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@map("wallets")
+}
+
+// ─────────────────────────────── Idempotence ───────────────────────────────
+
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+model IdempotencyKey {
+  id             String            @id @default(uuid()) @db.Uuid
+  ownerKey       String            @map("owner_key") // user id, ou "anonymous"
+  scope          String // ex. POST /v1/payments/intents
+  key            String // en-tête Idempotency-Key (UUID)
+  requestHash    String            @map("request_hash")
+  status         IdempotencyStatus @default(IN_PROGRESS)
+  responseStatus Int?              @map("response_status")
+  responseBody   Json?             @map("response_body")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  expiresAt      DateTime          @map("expires_at")
+
+  @@unique([ownerKey, scope, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}

@@ -1,0 +1,24 @@
+{
+  "name": "benskin-impact",
+  "private": true,
+  "description": "BENSKIN IMPACT — 200 FCFA aujourd'hui. Une opportunité demain.",
+  "packageManager": "pnpm@9.4.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "db:local": "node scripts/local-postgres.mjs start",
+    "db:local:stop": "node scripts/local-postgres.mjs stop",
+    "db:local:status": "node scripts/local-postgres.mjs status",
+    "api:dev": "pnpm --filter @benskin/api start:dev",
+    "mobile:dev": "node scripts/flutter-web-dev.mjs",
+    "api:test": "pnpm --filter @benskin/api test",
+    "api:test:e2e": "pnpm --filter @benskin/api test:e2e",
+    "db:migrate": "pnpm --filter @benskin/api prisma:migrate",
+    "db:deploy": "pnpm --filter @benskin/api prisma:deploy",
+    "db:seed": "pnpm --filter @benskin/api prisma:seed"
+  },
+  "devDependencies": {
+    "embedded-postgres": "18.4.0-beta.17"
+  }
+}
