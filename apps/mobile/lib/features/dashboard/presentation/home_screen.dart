@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/format/money_format.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/states.dart';
 import '../../auth/application/session_controller.dart';
+import '../../notifications/notifications.dart';
 import '../../wallet/application/wallet_providers.dart';
 import '../../wallet/presentation/widgets/balance_card.dart';
 import '../domain/dashboard.dart';
@@ -91,11 +93,7 @@ class _Header extends StatelessWidget {
                   Text('Voici votre situation du jour', style: text.bodyMedium?.copyWith(color: Colors.white70)),
                 ]),
               ),
-              IconButton(
-                tooltip: 'Notifications',
-                onPressed: () => showComingSoon(context, 'Le centre de notifications'),
-                icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
-              ),
+              const NotificationBell(),
               InkWell(
                 customBorder: const CircleBorder(),
                 onTap: () => context.go(Routes.profile),
@@ -142,23 +140,14 @@ class _DashboardBody extends StatelessWidget {
                 child: const Icon(Icons.savings_rounded, color: BColors.growth600),
               ),
               const SizedBox(width: BSpace.x3),
-              const Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    Flexible(child: Text('Contribution quotidienne', style: TextStyle(fontWeight: FontWeight.w800))),
-                    SizedBox(width: BSpace.x2),
-                    Text('200 FCFA / jour', style: TextStyle(color: BColors.growth600, fontWeight: FontWeight.w700, fontSize: 12)),
-                  ]),
-                  SizedBox(height: BSpace.x1),
-                  Text('Suivez vos cotisations et votre éligibilité aux tirages quotidiens.',
-                      style: TextStyle(color: BColors.textMuted, fontSize: 13)),
-                ]),
-              ),
+              Expanded(child: _ContributionSummary(data: dashboard.contribution)),
               const Icon(Icons.chevron_right_rounded, color: BColors.neutral400),
             ]),
           ),
         ),
       ),
+      const SizedBox(height: BSpace.x3),
+      _ProgramCard(dashboard: dashboard),
       const SizedBox(height: BSpace.x6),
       Text('Raccourcis', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
       const SizedBox(height: BSpace.x3),
@@ -173,29 +162,127 @@ class _DashboardBody extends StatelessWidget {
           _Shortcut(
             icon: Icons.emoji_events_rounded,
             label: 'Tirages',
-            enabled: dashboard.isEnabled('draws'),
+            enabled: true,
             onTap: () => context.push(Routes.draws),
           ),
           _Shortcut(
             icon: Icons.school_rounded,
             label: 'Formation',
-            enabled: dashboard.isEnabled('training'),
+            enabled: true,
             onTap: () => context.push(Routes.training),
           ),
           _Shortcut(
             icon: Icons.lightbulb_rounded,
             label: 'Projets',
-            enabled: dashboard.isEnabled('projects'),
+            enabled: true,
             onTap: () => context.push(Routes.projects),
           ),
           _Shortcut(
             icon: Icons.health_and_safety_rounded,
-            label: 'Accidents',
-            enabled: false,
-            onTap: () => showComingSoon(context, 'La déclaration d’accident'),
+            label: 'Solidarité',
+            enabled: true,
+            onTap: () => context.push(Routes.accidents),
+          ),
+          _Shortcut(
+            icon: Icons.work_outline_rounded,
+            label: 'Emploi',
+            enabled: true,
+            onTap: () => context.push(Routes.recruitment),
+          ),
+          _Shortcut(
+            icon: Icons.savings_rounded,
+            label: 'Cotiser',
+            enabled: true,
+            onTap: () => context.push(Routes.contributions),
           ),
         ],
       ),
+    ]);
+  }
+}
+
+/// Prochain tirage et éligibilité réelle du membre ; ouvre le parcours programme.
+class _ProgramCard extends StatelessWidget {
+  const _ProgramCard({required this.dashboard});
+  final Dashboard dashboard;
+
+  @override
+  Widget build(BuildContext context) {
+    final draw = dashboard.nextDraw;
+    final eligibility = dashboard.eligibility ?? const {};
+    final reasons = (eligibility['reasons'] as List?)?.cast<String>() ?? const <String>[];
+    final paid = (eligibility['paidDays'] as num?)?.toInt() ?? 0;
+    final required = (eligibility['requiredDays'] as num?)?.toInt() ?? 0;
+
+    final status = reasons.contains('ALREADY_BENEFICIARY')
+        ? 'Vous êtes bénéficiaire : suivez votre parcours.'
+        : eligibility['eligible'] == true
+            ? 'Vous êtes éligible au prochain tirage.'
+            : reasons.contains('KYC_NOT_APPROVED')
+                ? 'Identité à vérifier pour participer aux tirages.'
+                : '$paid / $required jours de contribution pour être éligible.';
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(BRadius.lg),
+      onTap: () => context.push(Routes.program),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(BSpace.x4),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(BSpace.x3),
+              decoration: const BoxDecoration(color: BColors.accent50, shape: BoxShape.circle),
+              child: const Icon(Icons.emoji_events_rounded, color: BColors.accent700),
+            ),
+            const SizedBox(width: BSpace.x3),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                  draw == null ? 'Mon parcours' : 'Prochain tirage : ${draw['title']}',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: BSpace.x1),
+                Text(status, style: const TextStyle(color: BColors.textMuted, fontSize: 13)),
+              ]),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: BColors.neutral400),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Résumé réel de la contribution du jour, fourni par le tableau de bord de l'API.
+class _ContributionSummary extends StatelessWidget {
+  const _ContributionSummary({required this.data});
+  final Map<String, dynamic>? data;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = data ?? const {};
+    final amount = (summary['dailyAmount'] as Map?)?['amount'] as String? ?? '200';
+    final eligible = summary['eligible'] == true;
+    final paidToday = summary['todayStatus'] == 'PAID';
+    final streak = (summary['streak'] as num?)?.toInt() ?? 0;
+
+    final (status, statusColor) = !eligible
+        ? ('Identité à vérifier pour contribuer', BColors.warning700)
+        : paidToday
+            ? ('Payée aujourd’hui · série de $streak jour${streak > 1 ? 's' : ''}', BColors.growth600)
+            : ('À payer aujourd’hui${streak > 0 ? ' · série de $streak jour${streak > 1 ? 's' : ''}' : ''}', BColors.accent700);
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        const Flexible(child: Text('Contribution quotidienne', style: TextStyle(fontWeight: FontWeight.w800))),
+        const SizedBox(width: BSpace.x2),
+        Text('${formatMoney(amount)} / jour',
+            style: const TextStyle(color: BColors.growth600, fontWeight: FontWeight.w700, fontSize: 12)),
+      ]),
+      const SizedBox(height: BSpace.x1),
+      Text(status, style: TextStyle(color: statusColor, fontSize: 13, fontWeight: FontWeight.w600)),
     ]);
   }
 }

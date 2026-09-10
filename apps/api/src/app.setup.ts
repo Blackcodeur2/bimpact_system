@@ -18,7 +18,7 @@ export function configureApp(app: INestApplication, config: AppConfig) {
     origin: config.corsOrigins.length > 0 ? config.corsOrigins : false,
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
     allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Request-Id'],
-    exposedHeaders: ['X-Request-Id'],
+    exposedHeaders: ['X-Request-Id', 'Idempotent-Replayed'],
   });
 
   app.setGlobalPrefix('v1', {

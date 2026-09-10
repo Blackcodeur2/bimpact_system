@@ -37,7 +37,7 @@ export async function createTestApp(): Promise<TestContext> {
     .overrideProvider(OTP_SENDER)
     .useValue(otp)
     .compile();
-  const app = moduleRef.createNestApplication({ logger: ['error', 'warn'] });
+  const app = moduleRef.createNestApplication({ logger: ['error', 'warn'], rawBody: true });
   configureApp(app, app.get(AppConfig));
   await app.init();
   return { app, otp, prisma: app.get(PrismaService), http: () => request(app.getHttpServer()) };

@@ -15,7 +15,8 @@
     "prisma:migrate": "pnpm db migrate dev",
     "prisma:deploy": "pnpm db migrate deploy",
     "prisma:seed": "node --env-file-if-exists=../../.env -r ts-node/register/transpile-only prisma/seed.ts",
-    "kyc:dev": "node --env-file-if-exists=../../.env -r ts-node/register/transpile-only scripts/kyc-review-dev.ts"
+    "kyc:dev": "node --env-file-if-exists=../../.env -r ts-node/register/transpile-only scripts/kyc-review-dev.ts",
+    "draw:dev": "node --env-file-if-exists=../../.env -r ts-node/register/transpile-only scripts/draw-dev.ts"
   },
   "dependencies": {
     "@nestjs/common": "11.2.3",

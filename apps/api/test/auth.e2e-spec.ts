@@ -74,10 +74,11 @@ describe('Auth, sessions et RBAC (E2E)', () => {
       expect(history.body).toEqual({ items: [], nextCursor: null });
 
       const dashboard = await ctx.http().get('/v1/me/dashboard').set(bearer(member.tokens.accessToken)).expect(200);
-      expect(dashboard.body.contribution).toBeNull();
-      expect(dashboard.body.nextDraw).toBeNull();
+      // Nouveau membre : pas encore éligible à la contribution tant que l'identité n'est pas vérifiée.
+      expect(dashboard.body.contribution).toMatchObject({ eligible: false, enrolled: false, todayStatus: 'DUE', streak: 0 });
+      expect(dashboard.body.eligibility).toMatchObject({ eligible: false, reasons: expect.arrayContaining(['KYC_NOT_APPROVED']) });
       expect(dashboard.body.alerts.map((a: { code: string }) => a.code)).toEqual(['KYC_REQUIRED']);
-      expect(dashboard.body.features.payments).toBe(false);
+      expect(dashboard.body.features.payments).toBe(true);
     });
 
     it('refuse un second compte sur le même numéro', async () => {

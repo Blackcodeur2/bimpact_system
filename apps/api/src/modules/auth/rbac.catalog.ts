@@ -10,6 +10,13 @@ export const PERMISSIONS = {
   'wallet.read.self': 'Consulter son portefeuille et son historique',
   'kyc.read.self': 'Consulter son dossier de vérification d’identité',
   'kyc.write.self': 'Compléter et soumettre son dossier de vérification d’identité',
+  'payments.read.self': 'Consulter ses paiements',
+  'payments.create.self': 'Recharger son portefeuille',
+  'notifications.read.self': 'Consulter et marquer ses notifications',
+  'contributions.read.self': 'Consulter sa contribution et son calendrier',
+  'contributions.pay.self': 'Payer sa contribution et régler le prélèvement automatique',
+  'draws.read.self': 'Consulter les tirages, son éligibilité et ses résultats',
+  'program.read.self': 'Suivre son parcours dans le programme',
 
   // Back-office
   'admin.dashboard.read': 'Tableau de bord administrateur',
@@ -26,6 +33,7 @@ export const PERMISSIONS = {
   'admin.draws.execute': 'Exécuter un tirage',
   'admin.draws.publish': 'Publier les résultats d’un tirage',
   'admin.beneficiaries.read': 'Suivre les bénéficiaires',
+  'admin.beneficiaries.manage': 'Faire évoluer le parcours d’un bénéficiaire (statut, mentor)',
   'admin.training.manage': 'Administrer la formation',
   'admin.projects.read': 'Consulter les projets',
   'admin.projects.decide': 'Décider d’un projet',
@@ -49,7 +57,21 @@ const ADMIN_ALL = ALL.filter((p) => p.startsWith('admin.'));
 export const ROLES: Record<string, { name: string; permissions: PermissionCode[] }> = {
   MEMBER: {
     name: 'Membre',
-    permissions: ['me.read', 'me.update', 'dashboard.read.self', 'wallet.read.self', 'kyc.read.self', 'kyc.write.self'],
+    permissions: [
+      'me.read',
+      'me.update',
+      'dashboard.read.self',
+      'wallet.read.self',
+      'kyc.read.self',
+      'kyc.write.self',
+      'payments.read.self',
+      'payments.create.self',
+      'notifications.read.self',
+      'contributions.read.self',
+      'contributions.pay.self',
+      'draws.read.self',
+      'program.read.self',
+    ],
   },
   SUPER_ADMIN: { name: 'Super administrateur', permissions: ADMIN_ALL },
   ADMIN: {
@@ -103,6 +125,7 @@ export const ROLES: Record<string, { name: string; permissions: PermissionCode[]
     permissions: [
       'admin.dashboard.read',
       'admin.beneficiaries.read',
+      'admin.beneficiaries.manage',
       'admin.training.manage',
       'admin.projects.read',
       'admin.projects.decide',
@@ -149,5 +172,12 @@ export const SYSTEM_LEDGER_ACCOUNTS = [
     type: 'EQUITY',
     purpose: 'ADJUSTMENTS',
     allowNegative: true,
+  },
+  {
+    code: 'system:solidarity_pool',
+    name: 'Pool Solidarité Accidents',
+    type: 'ASSET',
+    purpose: 'SOLIDARITY_POOL',
+    allowNegative: false,
   },
 ] as const;

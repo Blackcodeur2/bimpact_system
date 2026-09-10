@@ -62,6 +62,14 @@ describe('validateEnv', () => {
     );
   });
 
+  it('interdit le fournisseur de paiement sandbox en production', () => {
+    expect(() => validateEnv({ ...base, NODE_ENV: 'production', OTP_DEV_LOG: 'false' })).toThrow(/sandbox/);
+  });
+
+  it('refuse un montant minimum de paiement supérieur au maximum', () => {
+    expect(() => validateEnv({ ...base, PAYMENT_MIN_AMOUNT: '9000', PAYMENT_MAX_AMOUNT: '5000' })).toThrow(/PAYMENT_MIN_AMOUNT/);
+  });
+
   it("interdit l'affichage des OTP dans les logs en production", () => {
     expect(() => validateEnv({ ...base, NODE_ENV: 'production', OTP_DEV_LOG: 'true' })).toThrow(/OTP_DEV_LOG/);
   });

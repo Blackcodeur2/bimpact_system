@@ -1,251 +1,187 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/format/money_format.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/tokens.dart';
-import '../../../core/widgets/feedback.dart';
+import '../../../core/widgets/states.dart';
+import '../draws_data.dart';
 
-/// Écran de tirage transparent et auditable (cahier §7.11 et design-board).
+/// Tirages (cahier §7.11) : prochain tirage, éligibilité réelle du membre, résultats publiés.
 class DrawsScreen extends ConsumerWidget {
   const DrawsScreen({super.key});
 
-  void _showProofDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.verified_user_rounded, color: BColors.growth600),
-            SizedBox(width: BSpace.x2),
-            Text('Preuve cryptographique', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Chaque tirage BENSKIN IMPACT repose sur un algorithme déterministe et publiquement vérifiable pour garantir une équité totale.',
-              style: TextStyle(fontSize: 13.5, height: 1.4),
-            ),
-            const SizedBox(height: BSpace.x4),
-            Container(
-              padding: const EdgeInsets.all(BSpace.x3),
-              decoration: BoxDecoration(
-                color: BColors.neutral50,
-                borderRadius: BorderRadius.circular(BRadius.md),
-                border: Border.all(color: BColors.border),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Empreinte du tirage (SHA-256)', style: TextStyle(color: BColors.textMuted, fontSize: 11.5)),
-                  SizedBox(height: 4),
-                  SelectableText(
-                    '0x873d6a4f91b72e38c50d4f55a821e06f6c91a78e4d29b01c',
-                    style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: BSpace.x3),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Semence aléatoire (Seed)', style: TextStyle(color: BColors.textMuted, fontSize: 12)),
-                Text('Bloc #849201', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-              ],
-            ),
-            const SizedBox(height: BSpace.x1),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Horodatage certifié', style: TextStyle(color: BColors.textMuted, fontSize: 12)),
-                Text('12 avr. 2026 à 08:00:00 UTC', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Clipboard.setData(const ClipboardData(text: '0x873d6a4f91b72e38c50d4f55a821e06f6c91a78e4d29b01c'));
-              Navigator.pop(ctx);
-              showSuccessSnackBar(context, 'Empreinte copiée dans le presse-papier');
-            },
-            child: const Text('Copier le hash'),
-          ),
-          FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final next = ref.watch(nextDrawProvider);
+    final published = ref.watch(publishedDrawsProvider);
     final text = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: BColors.background,
-      appBar: AppBar(
-        title: const Text('Tirage', style: TextStyle(fontWeight: FontWeight.w800)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(BSpace.x4),
-          children: [
-            // Titre de section
-            Text('Sélection quotidienne', style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w900, color: BColors.navy900)),
-            const SizedBox(height: BSpace.x1),
-            const Text(
-              '10 bénéficiaires sélectionnés aujourd’hui parmi les conducteurs assidus.',
-              style: TextStyle(color: BColors.textMuted, fontSize: 14),
-            ),
-            const SizedBox(height: BSpace.x6),
-            // Carte principale résultat du tirage
-            Container(
-              padding: const EdgeInsets.all(BSpace.x6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(BRadius.xl),
-                boxShadow: BShadow.raised,
-              ),
-              child: Column(
-                children: [
-                  // Cercle animé 10/10
-                  Container(
-                    width: 130,
-                    height: 130,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: BColors.growth500, width: 8),
-                      color: BColors.growth50,
+      appBar: AppBar(title: const Text('Tirages', style: TextStyle(fontWeight: FontWeight.w800))),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref
+            ..invalidate(nextDrawProvider)
+            ..invalidate(publishedDrawsProvider);
+          try {
+            await ref.read(nextDrawProvider.future);
+          } catch (_) {}
+        },
+        child: ListView(padding: const EdgeInsets.all(BSpace.x4), children: [
+          Text('Prochain tirage', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: BSpace.x3),
+          next.when(
+            loading: () => const SkeletonBox(height: 220, radius: BRadius.xl),
+            error: (error, _) => ErrorState(error: error, onRetry: () => ref.invalidate(nextDrawProvider)),
+            data: (data) => _NextDrawCard(next: data),
+          ),
+          const SizedBox(height: BSpace.x6),
+          Text('Résultats publiés', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: BSpace.x3),
+          published.when(
+            loading: () => const SkeletonList(count: 2),
+            error: (error, _) => ErrorState(error: error, onRetry: () => ref.invalidate(publishedDrawsProvider)),
+            data: (draws) => draws.isEmpty
+                ? const Card(
+                    child: EmptyState(
+                      icon: Icons.emoji_events_outlined,
+                      title: 'Aucun résultat pour le moment',
+                      message: 'Les résultats et leur preuve d’intégrité apparaîtront ici après chaque tirage.',
                     ),
-                    alignment: Alignment.center,
-                    child: const Text(
-                      '10 / 10',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        color: BColors.growth700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: BSpace.x6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: BSpace.x3, vertical: BSpace.x1),
-                    decoration: BoxDecoration(
-                      color: BColors.accent50,
-                      borderRadius: BorderRadius.circular(BRadius.pill),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('✨ Félicitations ! ✨', style: TextStyle(color: BColors.accent700, fontWeight: FontWeight.w800)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: BSpace.x3),
-                  Text(
-                    'Vous êtes sélectionné pour le programme entrepreneurial.',
-                    textAlign: TextAlign.center,
-                    style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: BColors.navy900, height: 1.3),
-                  ),
-                  const SizedBox(height: BSpace.x2),
-                  const Text(
-                    'Accédez dès maintenant à votre formation de 6 mois prise en charge et bénéficiez de l’accompagnement de projet.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: BColors.textMuted, fontSize: 13.5, height: 1.4),
-                  ),
-                  const SizedBox(height: BSpace.x6),
-                  FilledButton(
-                    onPressed: () => context.push(Routes.training),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: BColors.growth600,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Commencer mon parcours'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: BSpace.x6),
-            // Bloc de transparence et audit
-            Container(
-              padding: const EdgeInsets.all(BSpace.x4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(BRadius.lg),
-                boxShadow: BShadow.card,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text('Certitude & Auditabilité', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                      ),
-                      const SizedBox(width: BSpace.x2),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: BSpace.x2, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: BColors.growth50,
-                          borderRadius: BorderRadius.circular(BRadius.pill),
+                  )
+                : Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(children: [
+                      for (final draw in draws)
+                        ListTile(
+                          onTap: () => context.push(Routes.draw(draw.id)),
+                          leading: const CircleAvatar(
+                            backgroundColor: BColors.growth50,
+                            child: Icon(Icons.verified_rounded, color: BColors.growth600),
+                          ),
+                          title: Text(draw.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                          subtitle: Text(
+                            '${draw.winnerCount} bénéficiaire${draw.winnerCount > 1 ? 's' : ''} sur ${draw.eligibleCount ?? '-'} participants · '
+                            '${formatDate(draw.publishedAt ?? draw.scheduledAt)}',
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
                         ),
-                        child: const Text('Terminé', style: TextStyle(color: BColors.growth700, fontSize: 11, fontWeight: FontWeight.w700)),
-                      ),
-                    ],
+                    ]),
                   ),
-                  const SizedBox(height: BSpace.x3),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(child: Text('Population éligible', style: TextStyle(color: BColors.textMuted))),
-                      Text('12 200 conducteurs', style: TextStyle(fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                  const SizedBox(height: BSpace.x2),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(child: Text('Bénéficiaires tirés', style: TextStyle(color: BColors.textMuted))),
-                      Text('10 retenus', style: TextStyle(fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                  const SizedBox(height: BSpace.x2),
-                  const Row(
-                    children: [
-                      Text('Empreinte vérifiable', style: TextStyle(color: BColors.textMuted)),
-                      Spacer(),
-                      Flexible(
-                        child: Text(
-                          '0x873d6...06f6',
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.w700, fontFamily: 'monospace'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: BSpace.x4),
-                  OutlinedButton.icon(
-                    onPressed: () => _showProofDialog(context),
-                    icon: const Icon(Icons.shield_outlined, size: 18),
-                    label: const Text('Voir la preuve du tirage'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ]),
       ),
     );
+  }
+}
+
+class _NextDrawCard extends StatelessWidget {
+  const _NextDrawCard({required this.next});
+  final NextDraw next;
+
+  @override
+  Widget build(BuildContext context) {
+    final draw = next.draw;
+    final eligibility = next.eligibility;
+    if (draw == null) {
+      return Card(
+        child: EmptyState(
+          icon: Icons.event_outlined,
+          title: 'Aucun tirage programmé',
+          message: eligibility.eligible
+              ? 'Vous remplissez déjà les conditions. Le prochain tirage sera annoncé dans l’application.'
+              : 'Continuez vos contributions : le prochain tirage sera annoncé dans l’application.',
+        ),
+      );
+    }
+
+    final remaining = draw.scheduledAt.difference(DateTime.now());
+    final countdown = remaining.isNegative
+        ? 'En cours de traitement'
+        : remaining.inDays >= 1
+            ? 'Dans ${remaining.inDays} jour${remaining.inDays > 1 ? 's' : ''}'
+            : 'Dans ${remaining.inHours} h ${remaining.inMinutes.remainder(60)} min';
+    final ratio = eligibility.requiredDays == 0 ? 0.0 : (eligibility.paidDays / eligibility.requiredDays).clamp(0.0, 1.0);
+
+    return Container(
+      padding: const EdgeInsets.all(BSpace.x6),
+      decoration: BoxDecoration(gradient: BColors.brandGradient, borderRadius: BorderRadius.circular(BRadius.xl), boxShadow: BShadow.raised),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text(draw.title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800))),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: BSpace.x3, vertical: BSpace.x1),
+            decoration: BoxDecoration(color: BColors.accent500, borderRadius: BorderRadius.circular(BRadius.pill)),
+            child: Text(countdown, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+          ),
+        ]),
+        const SizedBox(height: BSpace.x2),
+        Text('${formatDateTime(draw.scheduledAt)} · ${draw.winnerCount} bénéficiaire${draw.winnerCount > 1 ? 's' : ''}',
+            style: const TextStyle(color: Colors.white70)),
+        const Divider(color: Colors.white24, height: BSpace.x6),
+        Text(
+          'Conditions : identité vérifiée et ${draw.minPaidDays} jour${draw.minPaidDays > 1 ? 's' : ''} de contribution payés sur les ${draw.windowDays} derniers jours.',
+          style: const TextStyle(color: Colors.white, fontSize: 13.5),
+        ),
+        const SizedBox(height: BSpace.x3),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(BRadius.pill),
+          child: LinearProgressIndicator(
+            value: ratio,
+            minHeight: 8,
+            backgroundColor: Colors.white24,
+            valueColor: const AlwaysStoppedAnimation<Color>(BColors.accent500),
+          ),
+        ),
+        const SizedBox(height: BSpace.x2),
+        Text('${eligibility.paidDays} / ${eligibility.requiredDays} jours payés',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        const SizedBox(height: BSpace.x3),
+        _EligibilityLine(next: next),
+        if (draw.isFrozen && draw.snapshotHash != null) ...[
+          const SizedBox(height: BSpace.x3),
+          Text(
+            'Liste figée le ${formatDateTime(draw.snapshotAt!)} : ${draw.eligibleCount} participants. Empreinte ${draw.snapshotHash!.substring(0, 16)}…',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+        ],
+      ]),
+    );
+  }
+}
+
+class _EligibilityLine extends StatelessWidget {
+  const _EligibilityLine({required this.next});
+  final NextDraw next;
+
+  @override
+  Widget build(BuildContext context) {
+    final e = next.eligibility;
+    final (icon, label, action) = switch (true) {
+      _ when next.included == true => (Icons.check_circle_rounded, 'Vous participez à ce tirage.', null),
+      _ when next.included == false => (Icons.info_rounded, 'La liste des participants est figée : vous n’en faites pas partie.', null),
+      _ when e.reasons.contains('ALREADY_BENEFICIARY') => (Icons.star_rounded, 'Vous êtes déjà bénéficiaire du programme.', ('Mon parcours', Routes.program)),
+      _ when e.reasons.contains('KYC_NOT_APPROVED') => (Icons.shield_outlined, 'Vérifiez votre identité pour participer.', ('Vérifier', Routes.kyc)),
+      _ when e.eligible => (Icons.check_circle_rounded, 'Vous êtes éligible à ce tirage.', null),
+      _ => (
+          Icons.hourglass_bottom_rounded,
+          'Il vous manque ${e.requiredDays - e.paidDays} jour${e.requiredDays - e.paidDays > 1 ? 's' : ''} de contribution.',
+          ('Contribuer', Routes.contributions),
+        ),
+    };
+    return Row(children: [
+      Icon(icon, color: Colors.white),
+      const SizedBox(width: BSpace.x2),
+      Expanded(child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+      if (action != null)
+        TextButton(
+          style: TextButton.styleFrom(foregroundColor: Colors.white, backgroundColor: Colors.white24),
+          onPressed: () => context.push(action.$2),
+          child: Text(action.$1),
+        ),
+    ]);
   }
 }

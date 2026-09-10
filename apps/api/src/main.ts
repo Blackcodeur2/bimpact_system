@@ -6,7 +6,8 @@ import { configureApp } from './app.setup';
 import { AppConfig } from './config/app-config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // rawBody : les webhooks de paiement sont authentifiés par la signature du corps exact reçu.
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
 
   const config = app.get(AppConfig);

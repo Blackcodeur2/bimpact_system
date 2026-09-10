@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { Global, Injectable, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from './env.validation';
@@ -65,6 +66,46 @@ export class AppConfig {
 
   get pinPepper() {
     return this.get('PIN_PEPPER');
+  }
+
+  private generatedSandboxSecret?: string;
+
+  get payments() {
+    this.generatedSandboxSecret ??= randomBytes(32).toString('hex');
+    return {
+      provider: this.get('PAYMENT_PROVIDER'),
+      sandboxWebhookSecret: this.get('PAYMENTS_SANDBOX_WEBHOOK_SECRET') ?? this.generatedSandboxSecret,
+      sandboxConfirmDelaySeconds: this.get('PAYMENTS_SANDBOX_CONFIRM_DELAY_SECONDS'),
+      // En test, les confirmations sont déclenchées explicitement par les scénarios.
+      sandboxAutoConfirm: !this.isTest && this.get('PAYMENTS_SANDBOX_AUTO_CONFIRM'),
+      minAmount: this.get('PAYMENT_MIN_AMOUNT'),
+      maxAmount: this.get('PAYMENT_MAX_AMOUNT'),
+      dailyLimit: this.get('PAYMENT_DAILY_LIMIT'),
+      intentTtlMinutes: this.get('PAYMENT_INTENT_TTL_MINUTES'),
+    };
+  }
+
+  private generatedDrawSecret?: string;
+
+  get draws() {
+    this.generatedDrawSecret ??= randomBytes(32).toString('hex');
+    return {
+      tokenSecret: this.get('DRAW_TOKEN_SECRET') ?? this.generatedDrawSecret,
+      defaultMinPaidDays: this.get('DRAW_DEFAULT_MIN_PAID_DAYS'),
+      defaultWindowDays: this.get('DRAW_DEFAULT_WINDOW_DAYS'),
+    };
+  }
+
+  get contributions() {
+    return {
+      dailyAmount: this.get('CONTRIBUTION_DAILY_AMOUNT'),
+      autoDebitHour: this.get('CONTRIBUTION_AUTO_DEBIT_HOUR'),
+      reminderHour: this.get('CONTRIBUTION_REMINDER_HOUR'),
+    };
+  }
+
+  get jobsEnabled() {
+    return !this.isTest && this.get('JOBS_ENABLED');
   }
 
   get documents() {

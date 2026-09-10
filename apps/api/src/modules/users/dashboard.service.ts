@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { KycStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { ContributionsService } from '../contributions/contributions.service';
+import { DrawsService } from '../draws/draws.service';
 import { WalletService, WalletView } from '../wallet/wallet.service';
 import { UsersService } from './users.service';
 
@@ -17,10 +19,12 @@ export interface DashboardAlert {
  * pour que l'application affiche un état honnête (« bientôt disponible ») et jamais de fausse donnée.
  */
 const FEATURES = {
-  payments: false,
+  payments: true,
+  notifications: true,
   kyc: true,
-  contributions: false,
-  draws: false,
+  contributions: true,
+  draws: true,
+  program: true,
   training: false,
   projects: false,
   accidents: false,
@@ -32,21 +36,25 @@ export class DashboardService {
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
     private readonly wallets: WalletService,
+    private readonly contributions: ContributionsService,
+    private readonly draws: DrawsService,
   ) {}
 
   async forMember(userId: string) {
-    const [me, wallet, kyc] = await Promise.all([
+    const [me, wallet, kyc, contribution, draw] = await Promise.all([
       this.users.getMe(userId),
       this.wallets.getMine(userId),
       this.prisma.kycProfile.findUnique({ where: { userId }, select: { lastDecisionReason: true } }),
+      this.contributions.summary(userId),
+      this.draws.nextSummary(userId),
     ]);
     return {
       generatedAt: new Date(),
       user: { firstName: me.profile.firstName, lastName: me.profile.lastName, kycStatus: me.profile.kycStatus },
       wallet: summarizeWallet(wallet),
-      contribution: null,
-      eligibility: null,
-      nextDraw: null,
+      contribution,
+      eligibility: draw.eligibility,
+      nextDraw: draw.nextDraw,
       training: null,
       alerts: kycAlerts(me.profile.kycStatus, kyc?.lastDecisionReason ?? null),
       features: FEATURES,

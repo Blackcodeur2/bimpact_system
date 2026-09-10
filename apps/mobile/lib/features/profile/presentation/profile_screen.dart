@@ -94,6 +94,13 @@ class ProfileScreen extends ConsumerWidget {
                   trailing: StatusBadge.kyc(user.profile.kycStatus),
                   onTap: () => context.push(Routes.kyc),
                 ),
+                const Divider(indent: 56),
+                _SettingTile(
+                  icon: Icons.workspace_premium_outlined,
+                  title: 'Attestation & Certificat',
+                  subtitle: 'Formation entrepreneuriale validée',
+                  onTap: () => context.push('/training/certificate'),
+                ),
               ]),
             ),
             const _SectionTitle('Sécurité'),
@@ -103,27 +110,32 @@ class ProfileScreen extends ConsumerWidget {
                 _SettingTile(
                   icon: Icons.pin_outlined,
                   title: 'Changer mon code PIN',
-                  comingSoon: true,
-                  onTap: () => showComingSoon(context, 'Le changement de code PIN'),
+                  onTap: () => context.push('/profile/security'),
                 ),
                 const Divider(indent: 56),
                 _SettingTile(
                   icon: Icons.devices_outlined,
-                  title: 'Appareils connectés',
-                  comingSoon: true,
-                  onTap: () => showComingSoon(context, 'La gestion des appareils'),
+                  title: 'Appareils connectés & sessions',
+                  onTap: () => context.push('/profile/security'),
                 ),
               ]),
             ),
-            const _SectionTitle('Aide'),
+            const _SectionTitle('Aide & Solidarité'),
             Card(
               clipBehavior: Clip.antiAlias,
-              child: _SettingTile(
-                icon: Icons.support_agent_rounded,
-                title: 'Support',
-                comingSoon: true,
-                onTap: () => showComingSoon(context, 'Le support intégré'),
-              ),
+              child: Column(children: [
+                _SettingTile(
+                  icon: Icons.health_and_safety_outlined,
+                  title: 'Assistance Sinistre & Solidarité',
+                  onTap: () => context.push('/accidents'),
+                ),
+                const Divider(indent: 56),
+                _SettingTile(
+                  icon: Icons.support_agent_rounded,
+                  title: 'Support & Urgences (Permanence)',
+                  onTap: () => context.push('/profile/support'),
+                ),
+              ]),
             ),
             const SizedBox(height: BSpace.x6),
             OutlinedButton.icon(

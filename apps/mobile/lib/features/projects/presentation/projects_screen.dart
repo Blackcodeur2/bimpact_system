@@ -2,283 +2,244 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/formatters.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/feedback.dart';
+import '../application/projects_providers.dart';
+import '../domain/project_models.dart';
 
-/// Écran de gestion et soumission de projets d'entrepreneuriat (cahier §7.17, §7.18 et design-board).
-class ProjectsScreen extends ConsumerStatefulWidget {
+class ProjectsScreen extends ConsumerWidget {
   const ProjectsScreen({super.key});
 
   @override
-  ConsumerState<ProjectsScreen> createState() => _ProjectsScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final projectsAsync = ref.watch(projectsListProvider);
 
-class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
-  final _projects = [
-    (
-      title: 'Atelier mécanique et pièces motos',
-      location: 'Douala, Akwa',
-      budget: '1 200 000 FCFA',
-      status: 'En cours d’évaluation',
-      step: 3,
-      totalSteps: 6,
-    ),
-    (
-      title: 'Flotte de livraison express moto',
-      location: 'Yaoundé, Mokolo',
-      budget: '850 000 FCFA',
-      status: 'Brouillon',
-      step: 1,
-      totalSteps: 6,
-    ),
-  ];
-
-  void _openNewProjectModal() {
-    final formKey = GlobalKey<FormState>();
-    final titleController = TextEditingController();
-    final budgetController = TextEditingController();
-    final cityController = TextEditingController(text: 'Douala');
-    final descController = TextEditingController();
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(BRadius.xl)),
+    return Scaffold(
+      backgroundColor: BColors.surface,
+      appBar: AppBar(
+        title: const Text('Projets & Entreprises'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Nouveau projet',
+            onPressed: () => context.push('/projects/new'),
+          ),
+        ],
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: BSpace.x6,
-          right: BSpace.x6,
-          top: BSpace.x6,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + BSpace.x6,
-        ),
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+      body: projectsAsync.when(
+        data: (projects) => RefreshIndicator(
+          onRefresh: () async => ref.refresh(projectsListProvider.future),
+          child: ListView(
+            padding: const EdgeInsets.all(BSpace.x4),
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(color: BColors.neutral300, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const SizedBox(height: BSpace.x4),
-              const Text('Nouveau projet d’activité',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: BColors.navy900)),
-              const SizedBox(height: 2),
-              const Text('Complétez les premières informations pour créer votre dossier.',
-                  style: TextStyle(color: BColors.textMuted, fontSize: 13)),
-              const SizedBox(height: BSpace.x4),
-              TextFormField(
-                controller: titleController,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Indiquez un nom de projet' : null,
-                decoration: InputDecoration(
-                  labelText: 'Nom du projet / de l’activité',
-                  hintText: 'Ex: Atelier de réparation et pneumatique',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(BRadius.md)),
-                ),
-              ),
-              const SizedBox(height: BSpace.x3),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: budgetController,
-                      keyboardType: TextInputType.number,
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Indiquez un montant' : null,
-                      decoration: InputDecoration(
-                        labelText: 'Budget estimé',
-                        suffixText: 'FCFA',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(BRadius.md)),
-                      ),
-                    ),
+              // Hero banner
+              Container(
+                padding: const EdgeInsets.all(BSpace.x5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [BColors.primaryNavy, Color(0xFF1E3A8A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(width: BSpace.x3),
-                  Expanded(
-                    child: TextFormField(
-                      controller: cityController,
-                      decoration: InputDecoration(
-                        labelText: 'Ville d’implantation',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(BRadius.md)),
-                      ),
+                  borderRadius: BorderRadius.circular(BRadius.xl),
+                  boxShadow: [
+                    BoxShadow(
+                      color: BColors.primaryNavy.withValues(alpha: 0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: BSpace.x3),
-              TextFormField(
-                controller: descController,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  labelText: 'Description synthétique',
-                  hintText: 'Opportunité de marché, clients visés…',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(BRadius.md)),
+                  ],
                 ),
-              ),
-              const SizedBox(height: BSpace.x6),
-              FilledButton(
-                onPressed: () {
-                  if (formKey.currentState?.validate() ?? false) {
-                    setState(() {
-                      _projects.insert(
-                        0,
-                        (
-                          title: titleController.text.trim(),
-                          location: cityController.text.trim(),
-                          budget: '${budgetController.text.trim()} FCFA',
-                          status: 'En cours d’évaluation',
-                          step: 1,
-                          totalSteps: 6,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(BSpace.x2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(BRadius.md),
+                          ),
+                          child: const Icon(Icons.rocket_launch, color: Colors.white, size: 24),
                         ),
-                      );
-                    });
-                    Navigator.pop(ctx);
-                    showSuccessSnackBar(context, 'Dossier de projet créé avec succès !');
-                  }
-                },
-                child: const Text('Créer le dossier de projet'),
+                        const SizedBox(width: BSpace.x3),
+                        const Expanded(
+                          child: Text(
+                            'Financement de votre Projet',
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: BSpace.x3),
+                    const Text(
+                      'Soumettez votre business plan simplifié et bénéficiez des subventions et prêts d’honneur Benskin Impact.',
+                      style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                    ),
+                    const SizedBox(height: BSpace.x4),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: BColors.brandOrange,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BRadius.md)),
+                        ),
+                        onPressed: () => context.push('/projects/new'),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Déposer un projet', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+
+              const SizedBox(height: BSpace.x6),
+              const Text(
+                'Mes projets d’entreprise',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: BColors.textPrimary),
+              ),
+              const SizedBox(height: BSpace.x3),
+
+              if (projects.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(BSpace.x6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(BRadius.lg),
+                    border: Border.all(color: BColors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.storefront_outlined, size: 48, color: Colors.grey),
+                      const SizedBox(height: BSpace.x3),
+                      const Text(
+                        'Aucun projet déposé pour l’instant',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      const SizedBox(height: BSpace.x2),
+                      const Text(
+                        'Création d’un atelier mécanique, commerce, flotte de livraison... Déposez votre dossier dès maintenant.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: BColors.textSecondary, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                ...projects.map((p) => _buildProjectCard(context, p)),
             ],
+          ),
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: AppErrorState(
+            message: 'Impossible de charger vos projets.',
+            onRetry: () => ref.refresh(projectsListProvider),
           ),
         ),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
+  Widget _buildProjectCard(BuildContext context, ProjectItem p) {
+    final statusColor = switch (p.status) {
+      'APPROVED' || 'FUNDED' => BColors.brandGreen,
+      'REJECTED' => Colors.red,
+      'UNDER_REVIEW' => BColors.brandOrange,
+      _ => BColors.brandBlue,
+    };
 
-    return Scaffold(
-      backgroundColor: BColors.background,
-      appBar: AppBar(
-        title: const Text('Projets', style: TextStyle(fontWeight: FontWeight.w800)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.pop(),
-        ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: BSpace.x4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(BRadius.lg),
+        border: Border.all(color: BColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openNewProjectModal,
-        backgroundColor: BColors.primary500,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Nouveau projet', style: TextStyle(fontWeight: FontWeight.w700)),
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(BSpace.x4),
-          children: [
-            // Bannière d'accompagnement
-            Container(
-              padding: const EdgeInsets.all(BSpace.x4),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [BColors.navy800, BColors.primary600]),
-                borderRadius: BorderRadius.circular(BRadius.lg),
-                boxShadow: BShadow.raised,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(BSpace.x3),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(BRadius.lg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(BRadius.lg),
+          onTap: () => context.push('/projects/${p.id}'),
+          child: Padding(
+            padding: const EdgeInsets.all(BSpace.x4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: BSpace.x2, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(BRadius.sm),
+                      ),
+                      child: Text(
+                        p.statusLabel,
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
+                      ),
                     ),
-                    child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 28),
-                  ),
-                  const SizedBox(width: BSpace.x3),
-                  const Expanded(
-                    child: Column(
+                    const Spacer(),
+                    Text(
+                      '${p.city} • ${p.sector}',
+                      style: const TextStyle(fontSize: 12, color: BColors.textSecondary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: BSpace.x2),
+                Text(
+                  p.title,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: BColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  p.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, color: BColors.textSecondary, height: 1.3),
+                ),
+                const SizedBox(height: BSpace.x4),
+                Row(
+                  children: [
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Besoin d’aide pour monter votre projet ?',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14.5)),
-                        SizedBox(height: 2),
-                        Text('Votre mentor BENSKIN IMPACT vous conseille à chaque étape.',
-                            style: TextStyle(color: Colors.white70, fontSize: 12.5)),
+                        const Text('Budget total', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        Text(
+                          formatXaf(p.estimatedBudget),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: BSpace.x6),
-            Text('Mes projets en cours', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: BSpace.x3),
-            ..._projects.map((p) {
-              return Card(
-                margin: const EdgeInsets.only(bottom: BSpace.x3),
-                child: Padding(
-                  padding: const EdgeInsets.all(BSpace.x4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(p.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5)),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: BSpace.x2, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: p.status.contains('évaluation') ? BColors.primary50 : BColors.neutral100,
-                              borderRadius: BorderRadius.circular(BRadius.pill),
-                            ),
-                            child: Text(
-                              p.status,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: p.status.contains('évaluation') ? BColors.primary700 : BColors.textMuted,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: BSpace.x2),
-                      Row(
-                        children: [
-                          const Icon(Icons.place_outlined, size: 15, color: BColors.textMuted),
-                          const SizedBox(width: 4),
-                          Text(p.location, style: const TextStyle(color: BColors.textMuted, fontSize: 12.5)),
-                          const SizedBox(width: BSpace.x3),
-                          const Icon(Icons.monetization_on_outlined, size: 15, color: BColors.textMuted),
-                          const SizedBox(width: 4),
-                          Text(p.budget, style: const TextStyle(color: BColors.growth700, fontWeight: FontWeight.w700, fontSize: 12.5)),
-                        ],
-                      ),
-                      const SizedBox(height: BSpace.x3),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Étape ${p.step} sur ${p.totalSteps}', style: const TextStyle(fontSize: 12, color: BColors.textMuted)),
-                          Text('${((p.step / p.totalSteps) * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(BRadius.pill),
-                        child: LinearProgressIndicator(
-                          value: p.step / p.totalSteps,
-                          minHeight: 6,
-                          backgroundColor: BColors.neutral100,
-                          valueColor: const AlwaysStoppedAnimation<Color>(BColors.growth500),
+                    const SizedBox(width: BSpace.x6),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Subvention sollicitée', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        Text(
+                          formatXaf(p.grantRequested),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: BColors.brandBlue),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                    const Spacer(),
+                    const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                  ],
                 ),
-              );
-            }),
-            const SizedBox(height: BSpace.x8),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );

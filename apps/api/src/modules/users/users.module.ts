@@ -2,6 +2,8 @@ import { Body, Controller, Get, Module, Patch } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '../../common/access/access.decorators';
 import { AuthContext, Ctx, CurrentAuth, RequestContext } from '../../common/request-context';
+import { ContributionsModule } from '../contributions/contributions.module';
+import { DrawsModule } from '../draws/draws.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { DashboardService } from './dashboard.service';
 import { UpdateMeDto } from './users.dto';
@@ -36,7 +38,7 @@ export class MeController {
 }
 
 @Module({
-  imports: [WalletModule],
+  imports: [WalletModule, ContributionsModule, DrawsModule],
   controllers: [MeController],
   providers: [UsersService, DashboardService],
   exports: [UsersService],

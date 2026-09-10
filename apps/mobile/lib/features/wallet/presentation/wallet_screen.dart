@@ -6,6 +6,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/states.dart';
+import '../../payments/application/payments_providers.dart';
 import '../application/wallet_providers.dart';
 import 'widgets/balance_card.dart';
 import 'widgets/transaction_row.dart';
@@ -22,7 +23,8 @@ class WalletScreen extends ConsumerWidget {
     Future<void> refresh() async {
       ref
         ..invalidate(walletProvider)
-        ..invalidate(transactionsProvider(null));
+        ..invalidate(transactionsProvider(null))
+        ..invalidate(pendingPaymentsProvider);
       try {
         await ref.read(walletProvider.future);
       } catch (_) {}
@@ -65,6 +67,7 @@ class WalletScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+              const _PendingPayments(),
               if (loaded.data.status != 'ACTIVE') ...[
                 const SizedBox(height: BSpace.x3),
                 const FormErrorBanner('Portefeuille gelé : les opérations sont suspendues. Contactez le support.'),
@@ -103,6 +106,40 @@ class WalletScreen extends ConsumerWidget {
               error: (error, _) => ErrorState(error: error, onRetry: () => ref.invalidate(transactionsProvider(null))),
             ),
           ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Rechargements initiés mais pas encore confirmés : jamais comptés dans le solde.
+class _PendingPayments extends ConsumerWidget {
+  const _PendingPayments();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pending = ref.watch(pendingPaymentsProvider).valueOrNull ?? const [];
+    if (pending.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: BSpace.x4),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(BSpace.x4, BSpace.x3, BSpace.x4, 0),
+            child: Text('En attente de confirmation', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+          for (final payment in pending)
+            ListTile(
+              onTap: () => context.push(Routes.payment(payment.id)),
+              leading: const CircleAvatar(
+                backgroundColor: BColors.primary50,
+                child: Icon(Icons.hourglass_top_rounded, color: BColors.primary500),
+              ),
+              title: Text('Rechargement ${payment.amount.formatted}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('${payment.channelLabel} · non crédité tant que non confirmé'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+            ),
         ]),
       ),
     );
