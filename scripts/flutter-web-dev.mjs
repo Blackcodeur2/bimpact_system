@@ -18,12 +18,9 @@ const port = process.env.MOBILE_WEB_PORT ?? '5173';
 
 const log = (message) => console.log(`[${new Date().toLocaleTimeString('fr-FR')}] ${message}`);
 
-// MODULE_PREVIEWS=true : affiche les maquettes des modules sans backend, avec bandeau « données fictives ».
-const previews = process.env.MODULE_PREVIEWS === 'true' ? ['--dart-define=MODULE_PREVIEWS=true'] : [];
-
 const flutter = spawn(
   'flutter',
-  ['run', '--machine', '-d', 'web-server', '--web-port', port, '--web-hostname', 'localhost', ...previews],
+  ['run', '--machine', '-d', 'web-server', '--web-port', port, '--web-hostname', 'localhost'],
   { cwd: mobileDir, shell: process.platform === 'win32', stdio: ['pipe', 'pipe', 'pipe'] },
 );
 

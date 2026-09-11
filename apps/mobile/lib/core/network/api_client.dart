@@ -34,7 +34,15 @@ class ApiClient {
         responseType: ResponseType.json,
       );
 
-  static const _publicPaths = ['/auth/login', '/auth/register', '/auth/otp/', '/auth/refresh'];
+  static const _publicPaths = [
+    '/auth/login',
+    '/auth/register',
+    '/auth/otp/',
+    '/auth/refresh',
+    '/auth/pin-reset/',
+    '/config/mobile',
+    '/certificates/verify/',
+  ];
 
   Future<void> _attachToken(RequestOptions options, RequestInterceptorHandler handler) async {
     final isPublic = _publicPaths.any(options.path.startsWith);

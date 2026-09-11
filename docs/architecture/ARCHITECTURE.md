@@ -6,9 +6,9 @@ Ce document décrit ce qui est **réellement implémenté**. Le cible complète 
 
 | Couche | Techno | État |
 |---|---|---|
-| API | NestJS 11, TypeScript 5.9, Prisma 6 | Auth, RBAC, audit, ledger, wallet, dashboard, KYC + stockage documentaire chiffré |
+| API | NestJS 11, TypeScript 5.9, Prisma 6 | Auth, RBAC, audit, ledger, wallet, paiements, contributions, tirages, KYC, formation, projets, entreprises, recrutement, accidents + solidarité volontaire, support, configuration |
 | Base | PostgreSQL 18 (local via `embedded-postgres`, sans Docker) | Migrations + triggers d'intégrité |
-| Mobile | Flutter 3.38, Riverpod 2, go_router, Dio, freezed, drift | Splash → onboarding → inscription/OTP → connexion → accueil → portefeuille → historique → profil |
+| Mobile | Flutter 3.38, Riverpod 2, go_router, Dio, freezed, drift | Tous les modules du membre branchés sur l'API ; file hors ligne, verrouillage biométrique, maintenance/version minimale |
 | Back-office | Angular | Non commencé |
 | Jobs / temps réel | Redis + BullMQ, WebSocket/SSE | Non commencé |
 
@@ -23,12 +23,25 @@ src/
   modules/
     health/      /health (liveness), /ready (base joignable)
     audit/       AuditService (journal immuable) + GET /v1/admin/audit-logs
-    auth/        inscription + OTP, connexion PIN, sessions rotatives, gardes globales, catalogue RBAC
+    auth/        inscription + OTP, connexion PIN, réinitialisation du PIN par OTP, changement de PIN, appareils, sessions rotatives, gardes globales, catalogue RBAC
     users/       GET/PATCH /v1/me, GET /v1/me/dashboard
     ledger/      LedgerService (partie double, idempotence, verrous, contre-passation, vérifications)
     wallet/      GET /v1/wallet, GET /v1/wallet/transactions
+    payments/    recharges Mobile Money (prestataire sandbox), en-tête Idempotency-Key
+    contributions/ contribution quotidienne, calendrier, prélèvement automatique
+    draws/       tirages auditables (instantané, engagement de graine, résultats publiés), parcours programme
     storage/     stockage privé chiffré (AES-256-GCM), URLs signées GET /v1/files/:token, détection du type réel, antivirus (interface)
     kyc/         dossier membre (GET/PATCH /v1/kyc, POST documents, POST submit) et revue (/v1/admin/kyc : file, dossier, prise en charge, décision)
+    training/    modules débloqués dans l'ordre, progression des leçons, quiz (5 essais / 24 h), certificat vérifiable
+    projects/    dossier de projet (budget, financement, pièces), contrôles de cohérence, revue et décision
+    companies/   entreprises des membres, équipe, offres d'emploi
+    recruitment/ offres publiées, candidatures, suivi par l'employeur
+    accidents/   déclaration, pièces, instruction (prise en charge, décision, versement)
+    solidarity/  fonds de solidarité à adhésion volontaire (voir ci-dessous)
+    support/     FAQ, demandes et messages
+    settings/    paramètres pilotés par l'équipe (GET/PATCH /v1/admin/settings, audités)
+    platform/    GET /v1/config/mobile (public), POST /v1/analytics/events
+    notifications/ notifications in-app
 prisma/
   schema.prisma, seed.ts, migrations/
 ```
@@ -66,6 +79,14 @@ NOT_STARTED ──(première saisie)──▶ DRAFT ──(soumission complète)
 - `KycProviderInterface` : aujourd'hui revue manuelle ; un prestataire agréé pourra être branché sans toucher au cœur métier.
 - `profiles.kyc_status` reste un miroir de `kyc_profiles.status`, mis à jour dans la même transaction.
 
+### Fonds de solidarité
+
+- **Adhésion volontaire** : le membre accepte explicitement une version des règles (`solidarity.rules_version`) ; il peut se retirer à tout moment. Aucun portefeuille n'est débité sans adhésion active.
+- Couverture après un délai de carence (`solidarity.waiting_days`) ; la déclaration d'un accident survenu avant la fin de la carence reste possible mais n'ouvre pas droit à l'aide du fonds.
+- Les collectes sont **désactivées par défaut** (`solidarity.enabled=false`). Tant qu'elles le sont, une aide approuvée n'est pas versée automatiquement.
+- À l'approbation (collectes activées) : chaque adhérent actif, hors déclarant, contribue `solidarity.contribution_amount` (référence idempotente `solidarity:<dossier>:<membre>`) ; le montant approuvé ne peut dépasser `solidarity.max_assistance_amount` et le versement vaut `min(montant approuvé, solde du fonds)`. Le compte `system:solidarity_pool` est un passif.
+- Instruction : transitions verrouillées, décision interdite sur son propre dossier, historique `accident_claim_events` immuable, audit systématique.
+
 ### Sessions
 
 - Access token JWT 15 min (`sub`, `sid`, `kind`), refresh token opaque 30 jours stocké haché (SHA-256).
@@ -74,22 +95,25 @@ NOT_STARTED ──(première saisie)──▶ DRAFT ──(soumission complète)
 ## Mobile (`apps/mobile/lib`)
 
 ```
-core/      config, thème et tokens, formatage (XAF, téléphone), réseau (Dio + refresh unique), stockage sécurisé, cache drift, widgets d'état
-features/  auth, onboarding, splash, dashboard, wallet, profile, shell (navigation)
+core/      config (+ configuration distante), thème et tokens, formatage (XAF, téléphone), réseau (Dio + refresh unique),
+           stockage sécurisé, cache drift, file de synchronisation, verrouillage biométrique, analytics, widgets d'état
+features/  auth, onboarding, splash (maintenance / mise à jour), dashboard, wallet, payments, contributions, draws, kyc,
+           training, projects, companies, recruitment, accidents, support, notifications, profile, shell (navigation)
 ```
 
-- Les jetons sont dans le stockage sécurisé du système ; le cache local (drift) ne contient que des réponses de lecture, effacé à la déconnexion.
+- Les jetons sont dans le stockage sécurisé du système ; le cache local (drift) ne contient que des réponses de lecture et la file d'actions en attente, effacés à la déconnexion.
 - Hors ligne : les écrans affichent la dernière réponse avec sa date (« non actualisées »), jamais comme donnée fraîche.
-- Les modules sans backend (recharge, contributions, tirages, formation, projets, accidents) affichent « Bientôt disponible » via `ModulePreviewGate` : aucune donnée fictive n'est présentée comme réelle.
-- Leurs maquettes restent consultables en développement avec `--dart-define=MODULE_PREVIEWS=true` (ou `MODULE_PREVIEWS=true pnpm mobile:dev`), toujours accompagnées d'un bandeau « Aperçu — données fictives ». Aucune maquette n'initie ni ne simule d'opération financière.
+- File de synchronisation (`core/sync`) : seules les actions **non financières** (demande au support, message, candidature, projet, déclaration d'accident, progression de leçon) peuvent être mises en attente hors ligne. Elles sont rejouées avec la **même clé d'idempotence**, avec des délais croissants (5 s → 30 min max). Un refus métier marque l'action en échec, visible et supprimable par le membre. Les opérations financières (recharge, contribution) exigent le réseau et la confirmation du serveur.
+- Démarrage : `GET /v1/config/mobile` décide de l'écran de maintenance ou de mise à jour obligatoire (`mobile.min_version`).
+- Verrouillage de l'application par empreinte / visage (optionnel, `local_auth`) au retour en premier plan.
+- Génération de code (freezed, json_serializable, drift) : `dart run build_runner build --delete-conflicting-outputs` — le mode AOT échoue avec Flutter 3.38 (« build hooks »), lancer build_runner en JIT si nécessaire.
 
 ## Écarts assumés par rapport au cahier
 
 | Sujet | Décision | Raison |
 |---|---|---|
 | Docker (infra, CI, déploiement) | Aucun Docker | Choix du porteur du projet ; PostgreSQL local via binaires officiels |
-| `GET /v1/config/mobile` (splash) | Pas encore implémenté | Viendra avec les feature flags |
-| En-tête HTTP `Idempotency-Key` | Table prête, intercepteur à venir avec les paiements | L'idempotence financière est déjà garantie par la référence du ledger |
+| Solidarité | Adhésion volontaire, collectes désactivées par défaut | Aucun prélèvement sans consentement explicite du membre |
 | Connexion back-office avec MFA | Les comptes STAFF ne peuvent pas se connecter par PIN | Phase back-office |
 | Limitation de débit | Stockage mémoire (une instance) | Passage à Redis avec BullMQ |
 | Police Inter | Chargée via `google_fonts` (repli système hors ligne au premier lancement) | À embarquer dans les assets |

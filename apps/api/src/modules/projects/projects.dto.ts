@@ -1,45 +1,194 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, Min } from 'class-validator';
+import { ProjectDecision, ProjectStatus } from '@prisma/client';
+import { Transform, Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import {
+  cleanMultiline,
+  cleanText,
+  toAmountString,
+  XAF_AMOUNT_MESSAGE,
+  XAF_AMOUNT_OR_ZERO_RE,
+  XAF_AMOUNT_RE,
+} from '../../common/dto-helpers';
+import { CursorQueryDto } from '../../common/pagination';
 
-export class CreateProjectDto {
-  @ApiProperty({ example: 'Atelier mécanique et vente de pièces motos' })
+export class BudgetLineDto {
+  @Transform(cleanText)
   @IsString()
-  @IsNotEmpty()
-  title!: string;
+  @Length(2, 80)
+  label: string;
 
-  @ApiProperty({ example: 'Mécanique & Commerce' })
-  @IsString()
-  @IsNotEmpty()
-  sector!: string;
+  @Transform(toAmountString)
+  @Matches(XAF_AMOUNT_RE, { message: XAF_AMOUNT_MESSAGE })
+  amount: string;
+}
 
-  @ApiProperty({ example: 'Yaoundé' })
+export class TeamMemberDto {
+  @Transform(cleanText)
   @IsString()
-  @IsNotEmpty()
-  city!: string;
+  @Length(2, 80)
+  fullName: string;
 
-  @ApiPropertyOptional({ example: 'Carrefour Emombo' })
+  @Transform(cleanText)
   @IsString()
+  @Length(2, 60)
+  role: string;
+}
+
+export class ForecastsDto {
   @IsOptional()
-  locationDetail?: string;
+  @Transform(toAmountString)
+  @Matches(XAF_AMOUNT_OR_ZERO_RE, { message: XAF_AMOUNT_MESSAGE })
+  monthlyRevenue?: string;
 
-  @ApiProperty({ example: 1500000 })
-  @IsNumber()
-  @IsPositive()
-  estimatedBudget!: number;
+  @IsOptional()
+  @Transform(toAmountString)
+  @Matches(XAF_AMOUNT_OR_ZERO_RE, { message: XAF_AMOUNT_MESSAGE })
+  monthlyCosts?: string;
 
-  @ApiPropertyOptional({ example: 300000 })
-  @IsNumber()
+  @IsOptional()
+  @IsInt()
   @Min(0)
+  @Max(1000)
+  jobsCreated?: number;
+}
+
+/**
+ * Champs de la fiche projet, tous facultatifs : le brouillon s'enregistre au fil de la saisie.
+ * `null` efface une valeur ; la complétude n'est exigée qu'à la soumission.
+ */
+export class ProjectFieldsDto {
   @IsOptional()
-  personalContribution?: number;
-
-  @ApiProperty({ example: 1200000 })
-  @IsNumber()
-  @IsPositive()
-  grantRequested!: number;
-
-  @ApiProperty({ example: 'Description détaillée du projet et des débouchés attendus.' })
+  @Transform(cleanText)
   @IsString()
-  @IsNotEmpty()
-  description!: string;
+  @MaxLength(80)
+  sector?: string | null;
+
+  @IsOptional()
+  @Transform(cleanText)
+  @IsString()
+  @MaxLength(60)
+  city?: string | null;
+
+  @IsOptional()
+  @Transform(cleanText)
+  @IsString()
+  @MaxLength(120)
+  locationDetail?: string | null;
+
+  @IsOptional()
+  @Transform(cleanMultiline)
+  @IsString()
+  @MaxLength(2000)
+  problem?: string | null;
+
+  @IsOptional()
+  @Transform(cleanMultiline)
+  @IsString()
+  @MaxLength(2000)
+  solution?: string | null;
+
+  @IsOptional()
+  @Transform(cleanMultiline)
+  @IsString()
+  @MaxLength(2000)
+  market?: string | null;
+
+  @IsOptional()
+  @Transform(cleanMultiline)
+  @IsString()
+  @MaxLength(3000)
+  description?: string | null;
+
+  @IsOptional()
+  @Transform(toAmountString)
+  @Matches(XAF_AMOUNT_RE, { message: XAF_AMOUNT_MESSAGE })
+  estimatedBudget?: string | null;
+
+  @IsOptional()
+  @Transform(toAmountString)
+  @Matches(XAF_AMOUNT_OR_ZERO_RE, { message: XAF_AMOUNT_MESSAGE })
+  personalContribution?: string | null;
+
+  @IsOptional()
+  @Transform(toAmountString)
+  @Matches(XAF_AMOUNT_RE, { message: XAF_AMOUNT_MESSAGE })
+  grantRequested?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(30)
+  @ValidateNested({ each: true })
+  @Type(() => BudgetLineDto)
+  budgetLines?: BudgetLineDto[] | null;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => TeamMemberDto)
+  teamMembers?: TeamMemberDto[] | null;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ForecastsDto)
+  forecasts?: ForecastsDto | null;
+}
+
+export class CreateProjectDto extends ProjectFieldsDto {
+  @Transform(cleanText)
+  @IsString()
+  @Length(3, 120)
+  title: string;
+}
+
+export class UpdateProjectDto extends ProjectFieldsDto {
+  @IsOptional()
+  @Transform(cleanText)
+  @IsString()
+  @Length(3, 120)
+  title?: string;
+}
+
+export const PROJECT_DOCUMENT_TYPES = ['BUSINESS_PLAN', 'QUOTE', 'PHOTO', 'OTHER'] as const;
+
+export class UploadProjectDocumentDto {
+  @IsIn(PROJECT_DOCUMENT_TYPES)
+  type: (typeof PROJECT_DOCUMENT_TYPES)[number];
+}
+
+export class AdminProjectsQueryDto extends CursorQueryDto {
+  @IsOptional()
+  @IsEnum(ProjectStatus)
+  status?: ProjectStatus;
+}
+
+export class ProjectDecisionDto {
+  @IsEnum(ProjectDecision)
+  decision: ProjectDecision;
+
+  /** Motif communiqué au porteur. */
+  @Transform(cleanMultiline)
+  @IsString()
+  @Length(5, 1000)
+  reason: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  score?: number;
 }

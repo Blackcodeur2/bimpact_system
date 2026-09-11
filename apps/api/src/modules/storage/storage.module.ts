@@ -5,6 +5,7 @@ import { Public } from '../../common/access/access.decorators';
 import { AppException } from '../../common/errors/app-exception';
 import { DOCUMENT_STORAGE, DocumentStorage, EncryptedDiskStorage } from './document-storage';
 import { MALWARE_SCANNER, NotConfiguredMalwareScanner } from './file-types';
+import { PrivateUploadService } from './private-upload.service';
 import { SignedUrlService } from './signed-url.service';
 
 @ApiTags('files')
@@ -45,9 +46,10 @@ export class FilesController {
   controllers: [FilesController],
   providers: [
     SignedUrlService,
+    PrivateUploadService,
     { provide: DOCUMENT_STORAGE, useClass: EncryptedDiskStorage },
     { provide: MALWARE_SCANNER, useClass: NotConfiguredMalwareScanner },
   ],
-  exports: [SignedUrlService, DOCUMENT_STORAGE, MALWARE_SCANNER],
+  exports: [SignedUrlService, PrivateUploadService, DOCUMENT_STORAGE, MALWARE_SCANNER],
 })
 export class StorageModule {}

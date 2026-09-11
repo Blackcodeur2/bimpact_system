@@ -2,12 +2,13 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/data/cached_fetch.dart';
 import '../../../core/data/loaded.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/local_cache.dart';
 import '../domain/kyc_models.dart';
+
+export '../../../core/network/api_url.dart' show resolveApiUrl;
 
 /// Dossier KYC (cahier §7.5). Les règles (complétude, verrouillage, types de fichiers) sont appliquées par l'API.
 class KycRepository {
@@ -45,6 +46,3 @@ class KycRepository {
         (json) => KycDossier.fromJson(json as Map<String, dynamic>),
       );
 }
-
-/// Les URLs signées sont relatives à l'origine de l'API (« /v1/files/… »).
-String resolveApiUrl(String path) => Uri.parse(AppConfig.apiBaseUrl).resolve(path).toString();

@@ -48,8 +48,7 @@ abstract class DashboardAlert with _$DashboardAlert {
   factory DashboardAlert.fromJson(Map<String, dynamic> json) => _$DashboardAlertFromJson(json);
 }
 
-/// Tableau de bord conducteur (GET /v1/me/dashboard).
-/// Les sections des modules non encore livrés valent `null` : l'écran affiche « bientôt disponible ».
+/// Tableau de bord conducteur (GET /v1/me/dashboard) : situation réelle renvoyée par l'API.
 @freezed
 abstract class Dashboard with _$Dashboard {
   const Dashboard._();
@@ -62,6 +61,7 @@ abstract class Dashboard with _$Dashboard {
     Map<String, dynamic>? eligibility,
     Map<String, dynamic>? nextDraw,
     Map<String, dynamic>? training,
+    Map<String, dynamic>? solidarity,
     required List<DashboardAlert> alerts,
     required Map<String, bool> features,
   }) = _Dashboard;

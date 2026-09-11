@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/format/money_format.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/tokens.dart';
-import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/states.dart';
 import '../../auth/application/session_controller.dart';
 import '../../notifications/notifications.dart';
@@ -24,7 +23,9 @@ class HomeScreen extends ConsumerWidget {
     final dashboard = ref.watch(dashboardProvider);
 
     Future<void> refresh() async {
-      ref.invalidate(dashboardProvider);
+      ref
+        ..invalidate(dashboardProvider)
+        ..invalidate(unreadNotificationsProvider);
       try {
         await ref.read(dashboardProvider.future);
       } catch (_) {
@@ -87,8 +88,7 @@ class _Header extends StatelessWidget {
             Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Bonjour $firstName 👋',
-                      style: text.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
+                  Text('Bonjour $firstName 👋', style: text.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 2),
                   Text('Voici votre situation du jour', style: text.bodyMedium?.copyWith(color: Colors.white70)),
                 ]),
@@ -125,29 +125,21 @@ class _DashboardBody extends StatelessWidget {
       if (cachedAt != null) ...[CachedDataNotice(cachedAt: cachedAt!), const SizedBox(height: BSpace.x3)],
       for (final alert in dashboard.alerts) ...[_AlertCard(alert: alert), const SizedBox(height: BSpace.x3)],
       const SizedBox(height: BSpace.x2),
-      Text('Votre contribution', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+      Text('Votre programme', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
       const SizedBox(height: BSpace.x3),
-      InkWell(
-        borderRadius: BorderRadius.circular(BRadius.lg),
+      _ActionCard(
+        icon: Icons.savings_rounded,
+        iconColor: BColors.growth600,
+        background: BColors.growth50,
         onTap: () => context.push(Routes.contributions),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(BSpace.x4),
-            child: Row(children: [
-              Container(
-                padding: const EdgeInsets.all(BSpace.x3),
-                decoration: const BoxDecoration(color: BColors.growth50, shape: BoxShape.circle),
-                child: const Icon(Icons.savings_rounded, color: BColors.growth600),
-              ),
-              const SizedBox(width: BSpace.x3),
-              Expanded(child: _ContributionSummary(data: dashboard.contribution)),
-              const Icon(Icons.chevron_right_rounded, color: BColors.neutral400),
-            ]),
-          ),
-        ),
+        child: _ContributionSummary(data: dashboard.contribution),
       ),
       const SizedBox(height: BSpace.x3),
       _ProgramCard(dashboard: dashboard),
+      const SizedBox(height: BSpace.x3),
+      _TrainingCard(training: dashboard.training),
+      const SizedBox(height: BSpace.x3),
+      _SolidarityCard(solidarity: dashboard.solidarity),
       const SizedBox(height: BSpace.x6),
       Text('Raccourcis', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
       const SizedBox(height: BSpace.x3),
@@ -159,45 +151,49 @@ class _DashboardBody extends StatelessWidget {
         crossAxisSpacing: BSpace.x3,
         childAspectRatio: 0.78,
         children: [
-          _Shortcut(
-            icon: Icons.emoji_events_rounded,
-            label: 'Tirages',
-            enabled: true,
-            onTap: () => context.push(Routes.draws),
-          ),
-          _Shortcut(
-            icon: Icons.school_rounded,
-            label: 'Formation',
-            enabled: true,
-            onTap: () => context.push(Routes.training),
-          ),
-          _Shortcut(
-            icon: Icons.lightbulb_rounded,
-            label: 'Projets',
-            enabled: true,
-            onTap: () => context.push(Routes.projects),
-          ),
-          _Shortcut(
-            icon: Icons.health_and_safety_rounded,
-            label: 'Solidarité',
-            enabled: true,
-            onTap: () => context.push(Routes.accidents),
-          ),
-          _Shortcut(
-            icon: Icons.work_outline_rounded,
-            label: 'Emploi',
-            enabled: true,
-            onTap: () => context.push(Routes.recruitment),
-          ),
-          _Shortcut(
-            icon: Icons.savings_rounded,
-            label: 'Cotiser',
-            enabled: true,
-            onTap: () => context.push(Routes.contributions),
-          ),
+          _Shortcut(icon: Icons.emoji_events_rounded, label: 'Tirages', onTap: () => context.push(Routes.draws)),
+          _Shortcut(icon: Icons.school_rounded, label: 'Formation', onTap: () => context.push(Routes.training)),
+          _Shortcut(icon: Icons.lightbulb_rounded, label: 'Projets', onTap: () => context.push(Routes.projects)),
+          _Shortcut(icon: Icons.storefront_rounded, label: 'Entreprise', onTap: () => context.push(Routes.companies)),
+          _Shortcut(icon: Icons.work_outline_rounded, label: 'Emploi', onTap: () => context.push(Routes.recruitment)),
+          _Shortcut(icon: Icons.health_and_safety_rounded, label: 'Solidarité', onTap: () => context.push(Routes.accidents)),
+          _Shortcut(icon: Icons.route_rounded, label: 'Parcours', onTap: () => context.push(Routes.program)),
+          _Shortcut(icon: Icons.support_agent_rounded, label: 'Aide', onTap: () => context.push(Routes.support)),
         ],
       ),
     ]);
+  }
+}
+
+class _ActionCard extends StatelessWidget {
+  const _ActionCard({required this.icon, required this.iconColor, required this.background, required this.onTap, required this.child});
+  final IconData icon;
+  final Color iconColor;
+  final Color background;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(BRadius.lg),
+      onTap: onTap,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(BSpace.x4),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(BSpace.x3),
+              decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+              child: Icon(icon, color: iconColor),
+            ),
+            const SizedBox(width: BSpace.x3),
+            Expanded(child: child),
+            const Icon(Icons.chevron_right_rounded, color: BColors.neutral400),
+          ]),
+        ),
+      ),
+    );
   }
 }
 
@@ -222,35 +218,91 @@ class _ProgramCard extends StatelessWidget {
                 ? 'Identité à vérifier pour participer aux tirages.'
                 : '$paid / $required jours de contribution pour être éligible.';
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(BRadius.lg),
+    return _ActionCard(
+      icon: Icons.emoji_events_rounded,
+      iconColor: BColors.accent700,
+      background: BColors.accent50,
       onTap: () => context.push(Routes.program),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(BSpace.x4),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(BSpace.x3),
-              decoration: const BoxDecoration(color: BColors.accent50, shape: BoxShape.circle),
-              child: const Icon(Icons.emoji_events_rounded, color: BColors.accent700),
-            ),
-            const SizedBox(width: BSpace.x3),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(
-                  draw == null ? 'Mon parcours' : 'Prochain tirage : ${draw['title']}',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: BSpace.x1),
-                Text(status, style: const TextStyle(color: BColors.textMuted, fontSize: 13)),
-              ]),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: BColors.neutral400),
-          ]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(
+          draw == null ? 'Mon parcours' : 'Prochain tirage : ${draw['title']}',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-      ),
+        const SizedBox(height: BSpace.x1),
+        Text(status, style: const TextStyle(color: BColors.textMuted, fontSize: 13)),
+      ]),
+    );
+  }
+}
+
+class _TrainingCard extends StatelessWidget {
+  const _TrainingCard({required this.training});
+  final Map<String, dynamic>? training;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = training ?? const {};
+    final total = (t['totalModules'] as num?)?.toInt() ?? 0;
+    final completed = (t['completedModules'] as num?)?.toInt() ?? 0;
+    final percent = (t['progressPercent'] as num?)?.toInt() ?? 0;
+    final certified = t['certified'] == true;
+    final nextLesson = (t['current'] as Map?)?['nextLesson'] as Map?;
+
+    final subtitle = total == 0
+        ? 'Les modules seront disponibles dès leur publication.'
+        : certified
+            ? 'Formation validée : votre certificat est disponible.'
+            : nextLesson != null
+                ? 'Continuer : ${nextLesson['title']}'
+                : '$completed / $total modules validés';
+
+    return _ActionCard(
+      icon: certified ? Icons.workspace_premium_rounded : Icons.school_rounded,
+      iconColor: BColors.primary600,
+      background: BColors.primary50,
+      onTap: () => certified
+          ? context.push('/training/certificate')
+          : nextLesson != null
+              ? context.push('/training/lesson/${nextLesson['id']}')
+              : context.push(Routes.training),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Formation · $percent %', style: const TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: BSpace.x1),
+        Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: BColors.textMuted, fontSize: 13)),
+      ]),
+    );
+  }
+}
+
+class _SolidarityCard extends StatelessWidget {
+  const _SolidarityCard({required this.solidarity});
+  final Map<String, dynamic>? solidarity;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = solidarity ?? const {};
+    final member = s['member'] == true;
+    final covered = s['covered'] == true;
+    final coveredFrom = s['coveredFrom'] is String ? DateTime.parse(s['coveredFrom'] as String) : null;
+    final subtitle = !member
+        ? 'Adhésion facultative. Vous pouvez déclarer un accident dans tous les cas.'
+        : covered
+            ? 'Adhérent solidaire : vous êtes couvert.'
+            : coveredFrom != null
+                ? 'Adhérent : couvert à partir du ${formatDate(coveredFrom)}.'
+                : 'Adhérent solidaire.';
+    return _ActionCard(
+      icon: Icons.volunteer_activism_rounded,
+      iconColor: BColors.danger500,
+      background: BColors.danger50,
+      onTap: () => context.push(Routes.accidents),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Accidents & solidarité', style: TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: BSpace.x1),
+        Text(subtitle, style: const TextStyle(color: BColors.textMuted, fontSize: 13)),
+      ]),
     );
   }
 }
@@ -278,8 +330,7 @@ class _ContributionSummary extends StatelessWidget {
       Row(children: [
         const Flexible(child: Text('Contribution quotidienne', style: TextStyle(fontWeight: FontWeight.w800))),
         const SizedBox(width: BSpace.x2),
-        Text('${formatMoney(amount)} / jour',
-            style: const TextStyle(color: BColors.growth600, fontWeight: FontWeight.w700, fontSize: 12)),
+        Text('${formatMoney(amount)} / jour', style: const TextStyle(color: BColors.growth600, fontWeight: FontWeight.w700, fontSize: 12)),
       ]),
       const SizedBox(height: BSpace.x1),
       Text(status, style: TextStyle(color: statusColor, fontSize: 13, fontWeight: FontWeight.w600)),
@@ -311,30 +362,18 @@ class _AlertCard extends StatelessWidget {
             Text(alert.message, style: const TextStyle(color: BColors.text, fontSize: 13.5)),
           ]),
         ),
-        if (alert.action != null)
-          TextButton(
-            onPressed: () => alert.action!.deepLink == Routes.kyc
-                ? context.push(Routes.kyc)
-                : showComingSoon(context, 'Cette action'),
-            child: Text(alert.action!.label),
-          ),
+        if (alert.action != null && alert.action!.deepLink.startsWith('/'))
+          TextButton(onPressed: () => context.push(alert.action!.deepLink), child: Text(alert.action!.label)),
       ]),
     );
   }
 }
 
-
 class _Shortcut extends StatelessWidget {
-  const _Shortcut({
-    required this.icon,
-    required this.label,
-    required this.enabled,
-    required this.onTap,
-  });
+  const _Shortcut({required this.icon, required this.label, required this.onTap});
 
   final IconData icon;
   final String label;
-  final bool enabled;
   final VoidCallback onTap;
 
   @override
@@ -346,15 +385,11 @@ class _Shortcut extends StatelessWidget {
         Container(
           height: 56,
           width: 56,
-          decoration: BoxDecoration(
-            color: enabled ? BColors.primary50 : BColors.neutral100,
-            borderRadius: BorderRadius.circular(BRadius.lg),
-          ),
-          child: Icon(icon, color: enabled ? BColors.primary500 : BColors.neutral400),
+          decoration: BoxDecoration(color: BColors.primary50, borderRadius: BorderRadius.circular(BRadius.lg)),
+          child: Icon(icon, color: BColors.primary500),
         ),
         const SizedBox(height: BSpace.x2),
         Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
-        if (!enabled) const Text('Bientôt', style: TextStyle(fontSize: 10.5, color: BColors.textMuted)),
       ]),
     );
   }

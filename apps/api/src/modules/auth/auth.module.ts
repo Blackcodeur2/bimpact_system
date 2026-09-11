@@ -1,18 +1,29 @@
-import { Body, Controller, HttpCode, HttpStatus, Module, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Module, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
-import { Authenticated, Public } from '../../common/access/access.decorators';
+import { Authenticated, Public, RequirePermissions } from '../../common/access/access.decorators';
 import { AuthContext, Ctx, CurrentAuth, RequestContext } from '../../common/request-context';
 import { AppConfig } from '../../config/app-config';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { UsersModule } from '../users/users.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { AccessPolicyGuard, JwtAuthGuard } from './auth.guards';
 import { AuthService } from './auth.service';
-import { LoginDto, OtpRequestDto, OtpVerifyDto, RefreshDto, RegisterDto } from './dto';
+import {
+  ChangePinDto,
+  LoginDto,
+  OtpRequestDto,
+  OtpVerifyDto,
+  PinResetConfirmDto,
+  PinResetRequestDto,
+  RefreshDto,
+  RegisterDto,
+} from './dto';
 import { DevLogOtpSender, OTP_SENDER, OtpService, UnconfiguredOtpSender } from './otp.service';
 import { PinService } from './pin.service';
+import { SecurityService } from './security.service';
 import { TokenService } from './token.service';
 
 const PER_MINUTE = 60_000;
@@ -55,6 +66,22 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: PER_MINUTE } })
+  @Post('pin-reset/request')
+  @HttpCode(HttpStatus.ACCEPTED)
+  requestPinReset(@Body() dto: PinResetRequestDto) {
+    return this.auth.requestPinReset(dto);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: PER_MINUTE } })
+  @Post('pin-reset/confirm')
+  @HttpCode(HttpStatus.OK)
+  confirmPinReset(@Body() dto: PinResetConfirmDto, @Ctx() ctx: RequestContext) {
+    return this.auth.confirmPinReset(dto, ctx);
+  }
+
+  @Public()
   @Throttle({ default: { limit: 30, ttl: PER_MINUTE } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
@@ -71,10 +98,39 @@ export class AuthController {
   }
 }
 
+@ApiTags('security')
+@ApiBearerAuth()
+@Controller('security')
+export class SecurityController {
+  constructor(private readonly security: SecurityService) {}
+
+  @RequirePermissions('security.manage.self')
+  @Throttle({ default: { limit: 5, ttl: PER_MINUTE } })
+  @Post('pin')
+  @HttpCode(HttpStatus.OK)
+  changePin(@CurrentAuth() auth: AuthContext, @Body() dto: ChangePinDto, @Ctx() ctx: RequestContext) {
+    return this.security.changePin(auth, dto, ctx);
+  }
+
+  @RequirePermissions('security.manage.self')
+  @Get('devices')
+  devices(@CurrentAuth() auth: AuthContext) {
+    return this.security.devices(auth);
+  }
+
+  @RequirePermissions('security.manage.self')
+  @Post('devices/:id/revoke')
+  @HttpCode(HttpStatus.OK)
+  revokeDevice(@CurrentAuth() auth: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Ctx() ctx: RequestContext) {
+    return this.security.revokeDevice(auth, id, ctx);
+  }
+}
+
 @Module({
   imports: [
     UsersModule,
     WalletModule,
+    NotificationsModule,
     JwtModule.registerAsync({
       inject: [AppConfig],
       useFactory: (config: AppConfig) => ({
@@ -84,12 +140,13 @@ export class AuthController {
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, SecurityController],
   providers: [
     AuthService,
     OtpService,
     PinService,
     TokenService,
+    SecurityService,
     {
       provide: OTP_SENDER,
       inject: [AppConfig],

@@ -105,3 +105,30 @@ export class RefreshDto {
   @Length(40, 128)
   refreshToken: string;
 }
+
+/** Code PIN oublié — étape 1 : envoi d'un code par SMS. */
+export class PinResetRequestDto extends PhoneDto {}
+
+/** Code PIN oublié — étape 2 : code SMS + nouveau PIN ; ferme toutes les sessions existantes. */
+export class PinResetConfirmDto {
+  @IsUUID()
+  challengeId: string;
+
+  @Matches(/^\d{6}$/, { message: 'Le code doit contenir 6 chiffres.' })
+  code: string;
+
+  @Matches(PIN_RE, { message: 'Le code PIN doit contenir exactement 6 chiffres.' })
+  newPin: string;
+
+  @ValidateNested()
+  @Type(() => DeviceDto)
+  device: DeviceDto;
+}
+
+export class ChangePinDto {
+  @Matches(PIN_RE, { message: 'Le code PIN doit contenir exactement 6 chiffres.' })
+  currentPin: string;
+
+  @Matches(PIN_RE, { message: 'Le code PIN doit contenir exactement 6 chiffres.' })
+  newPin: string;
+}

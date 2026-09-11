@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/widgets/states.dart';
+import '../../core/widgets/sync_status.dart';
 
 /// Navigation principale (BottomNavigation — cahier §6).
 class MainShell extends StatelessWidget {
@@ -13,6 +14,7 @@ class MainShell extends StatelessWidget {
     return Scaffold(
       body: shell,
       bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
+        const SyncStatusBanner(),
         const OfflineBanner(),
         NavigationBar(
           selectedIndex: shell.currentIndex,

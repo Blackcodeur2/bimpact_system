@@ -1,174 +1,105 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../../../core/format/money_format.dart';
+import '../../../core/network/api_url.dart';
 import '../../../core/theme/tokens.dart';
-import '../../../core/widgets/feedback.dart';
+import '../../../core/widgets/states.dart';
 import '../application/training_providers.dart';
+import '../domain/training_models.dart';
 
+/// Certificat (cahier §7.16) : informations délivrées par le serveur et preuve vérifiable publiquement (QR code).
 class CertificateScreen extends ConsumerWidget {
   const CertificateScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final certsAsync = ref.watch(certificatesProvider);
-
+    final certificates = ref.watch(certificatesProvider);
     return Scaffold(
-      backgroundColor: BColors.surface,
-      appBar: AppBar(
-        title: const Text('Attestation & Certification'),
-      ),
-      body: certsAsync.when(
-        data: (certs) {
-          if (certs.isEmpty) {
+      appBar: AppBar(title: const Text('Mon certificat')),
+      body: certificates.when(
+        loading: () => const Padding(padding: EdgeInsets.all(BSpace.x4), child: SkeletonList(count: 3)),
+        error: (error, _) => ErrorState(error: error, onRetry: () => ref.invalidate(certificatesProvider)),
+        data: (items) {
+          if (items.isEmpty) {
             return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(BSpace.x6),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.school_outlined, size: 64, color: Colors.grey),
-                    const SizedBox(height: BSpace.x4),
-                    const Text(
-                      'Aucun certificat délivré pour le moment',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: BSpace.x2),
-                    const Text(
-                      'Complétez les 6 modules de formation et validez les quiz pour obtenir votre Certificat d’Entrepreneur officiel.',
-                      style: TextStyle(fontSize: 13, color: BColors.textSecondary, height: 1.4),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+              child: SingleChildScrollView(
+                child: EmptyState(
+                  icon: Icons.workspace_premium_outlined,
+                  title: 'Pas encore de certificat',
+                  message: 'Le certificat est délivré automatiquement quand vous avez validé le quiz de tous les modules.',
+                  action: OutlinedButton(onPressed: () => context.push('/training'), child: const Text('Continuer la formation')),
                 ),
               ),
             );
           }
-
-          final cert = certs.first;
-
-          return ListView(
-            padding: const EdgeInsets.all(BSpace.x4),
-            children: [
-              Container(
-                padding: const EdgeInsets.all(BSpace.x6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(BRadius.xl),
-                  border: Border.all(color: BColors.brandOrange, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: BColors.brandOrange.withValues(alpha: 0.15),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: BColors.brandOrange.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.verified, color: BColors.brandOrange, size: 36),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: BSpace.x4),
-                    const Text(
-                      'BENSKIN IMPACT ACADEMY',
-                      style: TextStyle(
-                        color: BColors.primaryNavy,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: BSpace.x2),
-                    const Text(
-                      'CERTIFICAT DE FORMATION ENTREPRENEURIALE',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                        color: BColors.primaryNavy,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const Divider(height: 32),
-                    const Text(
-                      'Décerné à :',
-                      style: TextStyle(fontSize: 13, color: BColors.textSecondary),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'KOUAM TEST',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: BColors.primaryNavy),
-                    ),
-                    const Text('Conducteur de moto-taxi — Yaoundé, Cameroun', style: TextStyle(fontSize: 12, color: BColors.textSecondary)),
-                    const SizedBox(height: BSpace.x4),
-                    const Text(
-                      'Pour avoir validé avec succès l’intégralité des 6 modules du programme : Esprit d’entreprise, Étude de marché, Modèle économique, Trésorerie, Marketing et Management.',
-                      style: TextStyle(fontSize: 13, height: 1.4, color: BColors.textPrimary),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: BSpace.x5),
-                    Container(
-                      padding: const EdgeInsets.all(BSpace.x3),
-                      decoration: BoxDecoration(
-                        color: BColors.surface,
-                        borderRadius: BorderRadius.circular(BRadius.md),
-                        border: Border.all(color: BColors.border),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.qr_code_2, size: 40, color: BColors.primaryNavy),
-                          const SizedBox(width: BSpace.x3),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('N° : ${cert.certificateNumber}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                Text('Empreinte : ${cert.verificationHash.substring(0, 16)}...', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: BSpace.x6),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: BColors.primaryNavy,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BRadius.md)),
-                  ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Attestation officielle prête à être partagée ou imprimée.')),
-                    );
-                  },
-                  icon: const Icon(Icons.share),
-                  label: const Text('Partager mon certificat', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          );
+          final certificate = items.firstWhere((c) => !c.revoked, orElse: () => items.first);
+          return ListView(padding: const EdgeInsets.all(BSpace.x4), children: [_CertificateCard(certificate: certificate)]);
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: AppErrorState(message: 'Impossible de charger l’attestation.', onRetry: () => ref.refresh(certificatesProvider))),
       ),
     );
+  }
+}
+
+class _CertificateCard extends StatelessWidget {
+  const _CertificateCard({required this.certificate});
+  final CertificateItem certificate;
+
+  @override
+  Widget build(BuildContext context) {
+    final verificationUrl = resolveApiUrl(certificate.verificationPath);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Container(
+        padding: const EdgeInsets.all(BSpace.x6),
+        decoration: BoxDecoration(
+          color: BColors.surface,
+          borderRadius: BorderRadius.circular(BRadius.xl),
+          border: Border.all(color: certificate.revoked ? BColors.danger500 : BColors.accent500, width: 2),
+          boxShadow: BShadow.card,
+        ),
+        child: Column(children: [
+          const Icon(Icons.workspace_premium_rounded, size: 48, color: BColors.accent500),
+          const SizedBox(height: BSpace.x2),
+          const Text('BENSKIN IMPACT', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.5, color: BColors.navy800)),
+          const SizedBox(height: BSpace.x2),
+          Text(certificate.title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: BColors.navy800)),
+          const Divider(height: BSpace.x8),
+          const Text('Délivré à', style: TextStyle(color: BColors.textMuted)),
+          Text(certificate.holderName, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: BSpace.x2),
+          Text('le ${formatDate(certificate.issuedAt)}', style: const TextStyle(color: BColors.textMuted)),
+          const SizedBox(height: BSpace.x4),
+          if (certificate.revoked)
+            const Text('Ce certificat a été révoqué.', style: TextStyle(color: BColors.danger500, fontWeight: FontWeight.w800))
+          else
+            QrImageView(data: verificationUrl, size: 160, backgroundColor: Colors.white),
+          const SizedBox(height: BSpace.x2),
+          SelectableText('N° ${certificate.certificateNumber}', style: const TextStyle(fontWeight: FontWeight.w700)),
+          SelectableText('Code de vérification : ${certificate.verificationCode}', style: const TextStyle(color: BColors.textMuted, fontSize: 12.5)),
+        ]),
+      ),
+      const SizedBox(height: BSpace.x4),
+      if (!certificate.revoked)
+        FilledButton.icon(
+          onPressed: () => SharePlus.instance.share(
+            ShareParams(
+              subject: certificate.title,
+              text: '${certificate.title} — ${certificate.holderName}, délivré le ${formatDate(certificate.issuedAt)}.\n'
+                  'N° ${certificate.certificateNumber}. Vérification : $verificationUrl',
+            ),
+          ),
+          icon: const Icon(Icons.share_rounded),
+          label: const Text('Partager'),
+        ),
+      const SizedBox(height: BSpace.x2),
+      const Text(
+        'Toute personne peut vérifier l’authenticité de ce certificat en scannant le QR code ou avec le code de vérification.',
+        textAlign: TextAlign.center,
+        style: TextStyle(color: BColors.textMuted, fontSize: 12.5),
+      ),
+    ]);
   }
 }

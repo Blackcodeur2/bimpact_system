@@ -1,21 +1,33 @@
-import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsNotEmpty, IsUUID, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsUUID, Max, Min, ValidateNested } from 'class-validator';
 
-export class SubmitAnswerItemDto {
-  @ApiProperty()
+export class QuizAnswerDto {
   @IsUUID()
-  questionId!: string;
+  questionId: string;
 
-  @ApiProperty()
   @IsInt()
-  selectedIndex!: number;
+  @Min(0)
+  @Max(20)
+  selectedIndex: number;
 }
 
 export class SubmitQuizDto {
-  @ApiProperty({ type: [SubmitAnswerItemDto] })
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
-  @Type(() => SubmitAnswerItemDto)
-  answers!: SubmitAnswerItemDto[];
+  @Type(() => QuizAnswerDto)
+  answers: QuizAnswerDto[];
+}
+
+export class LessonProgressDto {
+  @IsInt()
+  @Min(0)
+  @Max(86_400)
+  positionSeconds: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  progressPercent: number;
 }

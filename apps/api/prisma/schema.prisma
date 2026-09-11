@@ -1,4 +1,5 @@
-// BENSKIN IMPACT — schéma de données (phases 2 à 4 : identité, RBAC, audit, ledger, wallet, idempotence).
+// BENSKIN IMPACT — schéma de données : identité, RBAC, audit, ledger, wallet, paiements, contributions, tirages,
+// formation, projets, entreprises, recrutement, accidents & solidarité volontaire, support, analytics.
 // Conventions : UUID, snake_case en base, created_at/updated_at, montants en NUMERIC (jamais de float).
 // Les garanties d'intégrité financière (immutabilité, équilibre débit/crédit) sont renforcées
 // par des triggers PostgreSQL dans la migration `ledger_integrity`.
@@ -65,12 +66,16 @@ model User {
   drawEntries      DrawEntry[]
   beneficiary      Beneficiary?
 
-  lessonProgress   UserLessonProgress[]
-  quizSubmissions  QuizSubmission[]
-  certifications   Certification[]
-  projects         Project[]
-  accidentClaims   AccidentClaim[]
-  jobApplications  JobApplication[]
+  lessonProgress       UserLessonProgress[]
+  quizSubmissions      QuizSubmission[]
+  certifications       Certification[]
+  projects             Project[]
+  accidentClaims       AccidentClaim[]
+  jobApplications      JobApplication[]
+  solidarityMembership SolidarityMembership?
+  supportTickets       SupportTicket[]
+  ownedCompanies       Company[]
+  companyMemberships   CompanyMember[]
 
   @@index([status])
   @@index([createdAt])
@@ -207,15 +212,15 @@ model KycDocument {
 
 /// Historique immuable des décisions (UPDATE/DELETE bloqués par trigger).
 model KycReview {
-  id               String            @id @default(uuid()) @db.Uuid
-  kycProfileId     String            @map("kyc_profile_id") @db.Uuid
-  reviewerId       String            @map("reviewer_id") @db.Uuid
-  decision         KycReviewDecision
-  reason           String?
-  internalNotes    String?           @map("internal_notes")
-  submissionNumber Int               @map("submission_number")
-  documentDecisions Json?            @map("document_decisions")
-  createdAt        DateTime          @default(now()) @map("created_at")
+  id                String            @id @default(uuid()) @db.Uuid
+  kycProfileId      String            @map("kyc_profile_id") @db.Uuid
+  reviewerId        String            @map("reviewer_id") @db.Uuid
+  decision          KycReviewDecision
+  reason            String?
+  internalNotes     String?           @map("internal_notes")
+  submissionNumber  Int               @map("submission_number")
+  documentDecisions Json?             @map("document_decisions")
+  createdAt         DateTime          @default(now()) @map("created_at")
 
   kycProfile KycProfile @relation(fields: [kycProfileId], references: [id], onDelete: Restrict)
 
@@ -411,8 +416,8 @@ model LedgerTransaction {
   createdById  String?  @map("created_by_id") @db.Uuid
   postedAt     DateTime @default(now()) @map("posted_at")
 
-  reversalOf LedgerTransaction?  @relation("Reversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
-  reversedBy LedgerTransaction?  @relation("Reversal")
+  reversalOf LedgerTransaction? @relation("Reversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy LedgerTransaction? @relation("Reversal")
   entries    LedgerEntry[]
 
   @@index([type])
@@ -709,14 +714,14 @@ enum BeneficiaryStatus {
 }
 
 model Beneficiary {
-  id          String            @id @default(uuid()) @db.Uuid
-  userId      String            @unique @map("user_id") @db.Uuid
-  drawId      String            @map("draw_id") @db.Uuid
-  status      BeneficiaryStatus @default(SELECTED)
-  mentorName  String?           @map("mentor_name")
-  selectedAt  DateTime          @default(now()) @map("selected_at")
-  statusNote  String?           @map("status_note")
-  updatedAt   DateTime          @updatedAt @map("updated_at")
+  id         String            @id @default(uuid()) @db.Uuid
+  userId     String            @unique @map("user_id") @db.Uuid
+  drawId     String            @map("draw_id") @db.Uuid
+  status     BeneficiaryStatus @default(SELECTED)
+  mentorName String?           @map("mentor_name")
+  selectedAt DateTime          @default(now()) @map("selected_at")
+  statusNote String?           @map("status_note")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
   draw Draw @relation(fields: [drawId], references: [id], onDelete: Restrict)
@@ -790,12 +795,15 @@ model CourseLesson {
 }
 
 model UserLessonProgress {
-  id          String    @id @default(uuid()) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
-  lessonId    String    @map("lesson_id") @db.Uuid
-  isCompleted Boolean   @default(false) @map("is_completed")
-  completedAt DateTime? @map("completed_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  lessonId        String    @map("lesson_id") @db.Uuid
+  isCompleted     Boolean   @default(false) @map("is_completed")
+  /// Position de lecture (audio/vidéo) et avancement déclaré, pour reprendre la leçon.
+  positionSeconds Int       @default(0) @map("position_seconds")
+  progressPercent Int       @default(0) @map("progress_percent")
+  completedAt     DateTime? @map("completed_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   lesson CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
@@ -805,11 +813,11 @@ model UserLessonProgress {
 }
 
 model Quiz {
-  id          String   @id @default(uuid()) @db.Uuid
-  moduleId    String   @map("module_id") @db.Uuid
-  title       String
-  passScore   Int      @default(70) @map("pass_score") // Pourcentage requis (ex. 70%)
-  createdAt   DateTime @default(now()) @map("created_at")
+  id        String   @id @default(uuid()) @db.Uuid
+  moduleId  String   @map("module_id") @db.Uuid
+  title     String
+  passScore Int      @default(70) @map("pass_score") // Pourcentage requis (ex. 70%)
+  createdAt DateTime @default(now()) @map("created_at")
 
   module      CourseModule     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   questions   QuizQuestion[]
@@ -819,13 +827,13 @@ model Quiz {
 }
 
 model QuizQuestion {
-  id          String   @id @default(uuid()) @db.Uuid
-  quizId      String   @map("quiz_id") @db.Uuid
-  question    String
-  options     Json // ["Option A", "Option B", "Option C"]
+  id           String  @id @default(uuid()) @db.Uuid
+  quizId       String  @map("quiz_id") @db.Uuid
+  question     String
+  options      Json // ["Option A", "Option B", "Option C"]
   correctIndex Int     @map("correct_index")
-  explanation String?
-  order       Int      @default(1)
+  explanation  String?
+  order        Int     @default(1)
 
   quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
 
@@ -836,8 +844,10 @@ model QuizSubmission {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
   quizId    String   @map("quiz_id") @db.Uuid
-  score     Int // Pourcentage (0-100)
+  score     Int // Pourcentage (0-100), calculé par le serveur
   passed    Boolean
+  /// [{ questionId, selectedIndex }]
+  answers   Json?
   createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -847,15 +857,20 @@ model QuizSubmission {
   @@map("quiz_submissions")
 }
 
+/// Certificat délivré quand les quiz des 6 modules sont validés. Le code de vérification permet un contrôle public.
 model Certification {
-  id                String   @id @default(uuid()) @db.Uuid
-  userId            String   @map("user_id") @db.Uuid
-  certificateNumber String   @unique @map("certificate_number")
-  title             String   @default("Certificat d'Entrepreneur Benskin Impact")
-  issuedAt          DateTime @default(now()) @map("issued_at")
-  verificationHash  String   @unique @map("verification_hash")
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  certificateNumber String    @unique @map("certificate_number")
+  title             String    @default("Certificat de formation entrepreneuriale BENSKIN IMPACT")
+  /// Nom du titulaire figé à la délivrance.
+  holderName        String    @map("holder_name")
+  issuedAt          DateTime  @default(now()) @map("issued_at")
+  verificationCode  String    @unique @map("verification_code")
+  revokedAt         DateTime? @map("revoked_at")
+  revocationReason  String?   @map("revocation_reason")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([userId])
   @@map("certifications")
@@ -867,34 +882,95 @@ enum ProjectStatus {
   DRAFT
   SUBMITTED
   UNDER_REVIEW
+  CHANGES_REQUESTED
   APPROVED
   REJECTED
   FUNDED
+  ACTIVE
+  COMPLETED
 }
 
+/// Fiche projet (cahier §7.17-7.18) : brouillon libre, complétude exigée à la soumission, décision du comité auditée.
 model Project {
   id                   String        @id @default(uuid()) @db.Uuid
   userId               String        @map("user_id") @db.Uuid
   title                String
-  sector               String
-  city                 String
+  sector               String?
+  city                 String?
   locationDetail       String?       @map("location_detail")
-  estimatedBudget      Decimal       @map("estimated_budget") @db.Decimal(20, 2)
+  problem              String?       @db.Text
+  solution             String?       @db.Text
+  market               String?       @db.Text
+  description          String?       @db.Text
+  estimatedBudget      Decimal?      @map("estimated_budget") @db.Decimal(20, 2)
   personalContribution Decimal       @default(0) @map("personal_contribution") @db.Decimal(20, 2)
-  grantRequested       Decimal       @map("grant_requested") @db.Decimal(20, 2)
+  grantRequested       Decimal?      @map("grant_requested") @db.Decimal(20, 2)
+  /// [{ label, amount }] — montants en chaînes décimales.
+  budgetLines          Json?         @map("budget_lines")
+  /// [{ fullName, role }]
+  teamMembers          Json?         @map("team_members")
+  /// { monthlyRevenue, monthlyCosts, jobsCreated }
+  forecasts            Json?
   status               ProjectStatus @default(DRAFT)
-  description          String        @db.Text
-  businessPlan         Json?         @map("business_plan")
+  /// Dernier motif du comité visible par le porteur.
   reviewFeedback       String?       @map("review_feedback")
+  score                Int?
+  submittedAt          DateTime?     @map("submitted_at")
+  reviewerId           String?       @map("reviewer_id") @db.Uuid
+  reviewedAt           DateTime?     @map("reviewed_at")
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
 
   user          User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
   milestones    ProjectMilestone[]
   disbursements ProjectDisbursement[]
+  documents     ProjectDocument[]
+  reviews       ProjectReview[]
+  company       Company?
 
   @@index([userId, status])
+  @@index([status, submittedAt])
   @@map("projects")
+}
+
+model ProjectDocument {
+  id           String   @id @default(uuid()) @db.Uuid
+  projectId    String   @map("project_id") @db.Uuid
+  type         String // BUSINESS_PLAN, QUOTE, PHOTO, OTHER
+  storageKey   String   @unique @map("storage_key")
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  sha256       String
+  scanStatus   String   @default("NOT_SCANNED") @map("scan_status")
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@index([projectId])
+  @@map("project_documents")
+}
+
+enum ProjectDecision {
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+/// Historique immuable des décisions du comité (trigger).
+model ProjectReview {
+  id         String          @id @default(uuid()) @db.Uuid
+  projectId  String          @map("project_id") @db.Uuid
+  reviewerId String          @map("reviewer_id") @db.Uuid
+  decision   ProjectDecision
+  reason     String
+  score      Int?
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@index([projectId, createdAt])
+  @@map("project_reviews")
 }
 
 model ProjectMilestone {
@@ -935,10 +1011,12 @@ enum AccidentSeverity {
 
 enum AccidentClaimStatus {
   SUBMITTED
+  DOCUMENTS_PENDING
   INVESTIGATING
   APPROVED
   REJECTED
   DISBURSED
+  CLOSED
 }
 
 enum AccidentDocType {
@@ -947,12 +1025,14 @@ enum AccidentDocType {
   FACTURE_HOPITAL
   CONSTAT_POLICE
   PHOTO_MOTO
+  AUTRE
 }
 
+/// Déclaration d'accident (cahier §7.21-7.22, §8.13). Aucune prise en charge n'est promise : le comité décide.
 model AccidentClaim {
   id                  String              @id @default(uuid()) @db.Uuid
   userId              String              @map("user_id") @db.Uuid
-  reference           String              @unique // ex. ACC-2026-0001
+  reference           String              @unique // ex. ACC-2026-7K3QZP
   date                DateTime
   location            String
   severity            AccidentSeverity    @default(MODERATE)
@@ -962,48 +1042,161 @@ model AccidentClaim {
   status              AccidentClaimStatus @default(SUBMITTED)
   requestedAmount     Decimal             @map("requested_amount") @db.Decimal(20, 2)
   approvedAmount      Decimal?            @map("approved_amount") @db.Decimal(20, 2)
+  disbursedAmount     Decimal?            @map("disbursed_amount") @db.Decimal(20, 2)
+  /// Motif visible par le membre (pièces demandées, refus, décision).
   reviewNotes         String?             @map("review_notes")
+  /// Notes du comité, jamais montrées au membre.
+  internalNotes       String?             @map("internal_notes")
+  /// Adhérent solidaire couvert à la date de l'accident (adhésion active et délai de carence écoulé).
+  solidarityEligible  Boolean             @default(false) @map("solidarity_eligible")
+  decidedById         String?             @map("decided_by_id") @db.Uuid
+  decidedAt           DateTime?           @map("decided_at")
   ledgerTransactionId String?             @unique @map("ledger_transaction_id") @db.Uuid
   createdAt           DateTime            @default(now()) @map("created_at")
   updatedAt           DateTime            @updatedAt @map("updated_at")
 
-  user      User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
   documents ClaimDocument[]
+  events    AccidentClaimEvent[]
 
   @@index([userId, status])
+  @@index([status, createdAt])
   @@map("accident_claims")
 }
 
 model ClaimDocument {
-  id         String          @id @default(uuid()) @db.Uuid
-  claimId    String          @map("claim_id") @db.Uuid
-  type       AccidentDocType
-  storageKey String          @unique @map("storage_key")
-  mimeType   String          @map("mime_type")
-  sizeBytes  Int             @map("size_bytes")
-  createdAt  DateTime        @default(now()) @map("created_at")
+  id           String          @id @default(uuid()) @db.Uuid
+  claimId      String          @map("claim_id") @db.Uuid
+  type         AccidentDocType
+  storageKey   String          @unique @map("storage_key")
+  mimeType     String          @map("mime_type")
+  sizeBytes    Int             @map("size_bytes")
+  sha256       String
+  scanStatus   String          @default("NOT_SCANNED") @map("scan_status")
+  uploadedById String          @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime        @default(now()) @map("created_at")
 
-  claim AccidentClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  claim AccidentClaim @relation(fields: [claimId], references: [id], onDelete: Restrict)
 
+  @@index([claimId])
   @@map("claim_documents")
 }
 
-// ─────────────────────────────── Recrutement & Partenariats ───────────────────────────────
+/// Chronologie du dossier visible par le membre (les notes internes n'y figurent jamais). Immuable (trigger).
+model AccidentClaimEvent {
+  id        String               @id @default(uuid()) @db.Uuid
+  claimId   String               @map("claim_id") @db.Uuid
+  /// SUBMITTED, DOCUMENT_ADDED, DOCUMENTS_REQUESTED, MEMBER_MESSAGE, INVESTIGATION_STARTED, APPROVED, REJECTED, DISBURSED, CLOSED
+  type      String
+  status    AccidentClaimStatus?
+  message   String?
+  actorType String               @map("actor_type")
+  actorId   String?              @map("actor_id") @db.Uuid
+  createdAt DateTime             @default(now()) @map("created_at")
 
+  claim AccidentClaim @relation(fields: [claimId], references: [id], onDelete: Restrict)
+
+  @@index([claimId, createdAt])
+  @@map("accident_claim_events")
+}
+
+enum SolidarityMembershipStatus {
+  ACTIVE
+  LEFT
+}
+
+/// Adhésion VOLONTAIRE au fonds de solidarité (cahier §10, §16) : consentement explicite, résiliable à tout moment.
+/// Seuls les adhérents actifs participent aux collectes ; les prélèvements restent désactivés tant que
+/// le paramètre `solidarity.enabled` n'est pas activé après validation juridique.
+model SolidarityMembership {
+  id           String                     @id @default(uuid()) @db.Uuid
+  userId       String                     @unique @map("user_id") @db.Uuid
+  status       SolidarityMembershipStatus @default(ACTIVE)
+  rulesVersion String                     @map("rules_version")
+  joinedAt     DateTime                   @default(now()) @map("joined_at")
+  leftAt       DateTime?                  @map("left_at")
+  updatedAt    DateTime                   @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([status, joinedAt])
+  @@map("solidarity_memberships")
+}
+
+// ─────────────────────────────── Entreprises & Recrutement ───────────────────────────────
+
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+/// Entreprise créée par un porteur à partir d'un projet approuvé (cahier §7.19).
+model Company {
+  id          String        @id @default(uuid()) @db.Uuid
+  ownerId     String        @map("owner_id") @db.Uuid
+  projectId   String?       @unique @map("project_id") @db.Uuid
+  name        String
+  sector      String
+  city        String
+  description String?       @db.Text
+  phone       String?
+  status      CompanyStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  owner     User            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  project   Project?        @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  members   CompanyMember[]
+  jobOffers JobOffer[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@map("companies")
+}
+
+model CompanyMember {
+  id        String    @id @default(uuid()) @db.Uuid
+  companyId String    @map("company_id") @db.Uuid
+  userId    String?   @map("user_id") @db.Uuid
+  fullName  String    @map("full_name")
+  role      String
+  joinedAt  DateTime  @default(now()) @map("joined_at")
+  leftAt    DateTime? @map("left_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([userId])
+  @@map("company_members")
+}
+
+/// Offre publiée par une entreprise du programme (ou par l'équipe pour un partenaire vérifié).
 model JobOffer {
-  id           String   @id @default(uuid()) @db.Uuid
+  id           String    @id @default(uuid()) @db.Uuid
+  companyId    String?   @map("company_id") @db.Uuid
   title        String
+  /// Nom affiché de l'employeur.
   company      String
   sector       String
   location     String
-  salaryHint   String?  @map("salary_hint")
+  salaryHint   String?   @map("salary_hint")
   requirements String?
-  description  String   @db.Text
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
+  skills       String[]  @default([])
+  slots        Int       @default(1)
+  description  String    @db.Text
+  isActive     Boolean   @default(true) @map("is_active")
+  closedAt     DateTime? @map("closed_at")
+  createdById  String?   @map("created_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
+  employer     Company?         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   applications JobApplication[]
 
+  @@index([isActive, createdAt])
+  @@index([companyId])
   @@map("job_offers")
 }
 
@@ -1012,6 +1205,8 @@ enum JobApplicationStatus {
   SHORTLISTED
   CONTACTED
   HIRED
+  REJECTED
+  WITHDRAWN
 }
 
 model JobApplication {
@@ -1021,11 +1216,13 @@ model JobApplication {
   status     JobApplicationStatus @default(PENDING)
   message    String?
   createdAt  DateTime             @default(now()) @map("created_at")
+  updatedAt  DateTime             @updatedAt @map("updated_at")
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobOffer JobOffer @relation(fields: [jobOfferId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  jobOffer JobOffer @relation(fields: [jobOfferId], references: [id], onDelete: Restrict)
 
   @@unique([userId, jobOfferId])
+  @@index([jobOfferId, status])
   @@map("job_applications")
 }
 
@@ -1034,11 +1231,73 @@ model JobApplication {
 model SystemSetting {
   id          String   @id @default(uuid()) @db.Uuid
   key         String   @unique // ex. accidents.solidarity_debit_amount
-  value       String   // valeur sérialisée (nombre, JSON, etc.)
+  value       String // valeur sérialisée (nombre, JSON, etc.)
   description String?
   updatedById String?  @map("updated_by_id") @db.Uuid
   updatedAt   DateTime @updatedAt @map("updated_at")
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@map("system_settings")
+}
+
+// ─────────────────────────────── Support ───────────────────────────────
+
+enum SupportTicketStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+/// Ticket support (cahier §7.25). OPEN = en attente de l'équipe, PENDING = en attente du membre.
+model SupportTicket {
+  id            String              @id @default(uuid()) @db.Uuid
+  reference     String              @unique
+  userId        String              @map("user_id") @db.Uuid
+  /// ACCOUNT, PAYMENT, CONTRIBUTION, DRAW, TRAINING, PROJECT, ACCIDENT, OTHER
+  category      String
+  subject       String
+  status        SupportTicketStatus @default(OPEN)
+  lastMessageAt DateTime            @default(now()) @map("last_message_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  user     User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  messages SupportTicketMessage[]
+
+  @@index([userId, createdAt])
+  @@index([status, lastMessageAt])
+  @@map("support_tickets")
+}
+
+/// Messages d'un ticket. Immuables (trigger).
+model SupportTicketMessage {
+  id         String   @id @default(uuid()) @db.Uuid
+  ticketId   String   @map("ticket_id") @db.Uuid
+  authorId   String   @map("author_id") @db.Uuid
+  /// MEMBER, STAFF
+  authorType String   @map("author_type")
+  body       String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_messages")
+}
+
+// ─────────────────────────────── Analytics ───────────────────────────────
+
+/// Évènements d'usage (cahier §7.2). Aucune donnée personnelle dans `properties`.
+model AnalyticsEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  installationId String?  @map("installation_id")
+  name           String
+  properties     Json?
+  occurredAt     DateTime @map("occurred_at")
+  receivedAt     DateTime @default(now()) @map("received_at")
+
+  @@index([name, occurredAt])
+  @@map("analytics_events")
 }

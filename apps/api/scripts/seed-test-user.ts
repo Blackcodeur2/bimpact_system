@@ -18,7 +18,9 @@ import { PrismaClient, EntryDirection, LedgerAccountType } from '@prisma/client'
 
 const PHONE = '+237690000001';
 const PIN = '147258';
-const PEPPER = process.env.PIN_PEPPER ?? '3lE3vBDa38bFJH3Gcg6g7zfoaxozE1GJLV6cFBbrLBd7MNzldFrng4Z7Cyyrfa';
+// Le pepper vient uniquement de l'environnement (.env) : aucun secret dans le dépôt.
+const PEPPER = process.env.PIN_PEPPER;
+if (!PEPPER) throw new Error('PIN_PEPPER manquant : lancez ce script avec le .env du projet.');
 
 async function main() {
   const prisma = new PrismaClient();

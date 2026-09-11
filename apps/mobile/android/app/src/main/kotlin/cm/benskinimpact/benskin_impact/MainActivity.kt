@@ -1,5 +1,6 @@
 package cm.benskinimpact.benskin_impact
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+// FlutterFragmentActivity est requis par local_auth (déverrouillage biométrique).
+class MainActivity : FlutterFragmentActivity()

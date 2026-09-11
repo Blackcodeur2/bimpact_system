@@ -1,176 +1,189 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/remote_config.dart';
+import '../../../core/format/money_format.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/feedback.dart';
+import '../../../core/widgets/states.dart';
+import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/sync_status.dart';
+import '../../support/support_data.dart';
 
-class SupportScreen extends StatelessWidget {
+/// Support (cahier §7.25) : contacts réellement configurés, FAQ fournie par l'API, demandes suivies.
+class SupportScreen extends ConsumerWidget {
   const SupportScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(remoteConfigProvider).valueOrNull?.data;
+    final faq = ref.watch(faqProvider);
+    final tickets = ref.watch(ticketsProvider);
+
     return Scaffold(
-      backgroundColor: BColors.surface,
-      appBar: AppBar(
-        title: const Text('Support & Urgences'),
+      appBar: AppBar(title: const Text('Aide & support')),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/profile/support/new'),
+        icon: const Icon(Icons.edit_outlined),
+        label: const Text('Nouvelle demande'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(BSpace.x4),
-        children: [
-          // Emergency call button
-          Container(
-            padding: const EdgeInsets.all(BSpace.x5),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF842029), Color(0xFFDC3545)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+      body: Column(children: [
+        const SyncStatusBanner(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              ref
+                ..invalidate(ticketsProvider)
+                ..invalidate(faqProvider);
+              try {
+                await ref.read(ticketsProvider.future);
+              } catch (_) {}
+            },
+            child: ListView(padding: const EdgeInsets.fromLTRB(BSpace.x4, BSpace.x4, BSpace.x4, 96), children: [
+              _ContactsCard(contacts: config?.support),
+              const SizedBox(height: BSpace.x6),
+              const _SectionTitle('Mes demandes'),
+              tickets.when(
+                loading: () => const SkeletonList(count: 2),
+                error: (error, _) => ErrorState(error: error, onRetry: () => ref.invalidate(ticketsProvider)),
+                data: (items) => items.isEmpty
+                    ? const Card(
+                        child: EmptyState(
+                          icon: Icons.forum_outlined,
+                          title: 'Aucune demande',
+                          message: 'Posez votre question à l’équipe : vous serez notifié de sa réponse.',
+                        ),
+                      )
+                    : Card(
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(children: [
+                          for (final (index, ticket) in items.indexed) ...[
+                            if (index > 0) const Divider(indent: BSpace.x4),
+                            ListTile(
+                              onTap: () => context.push('/profile/support/tickets/${ticket.id}'),
+                              title: Text(ticket.subject, style: const TextStyle(fontWeight: FontWeight.w700)),
+                              subtitle: Text('${ticket.reference} · ${ticket.categoryLabel}\nMis à jour le ${formatDateTime(ticket.lastMessageAt)}'),
+                              isThreeLine: true,
+                              trailing: _TicketBadge(status: ticket.status),
+                            ),
+                          ],
+                        ]),
+                      ),
               ),
-              borderRadius: BorderRadius.circular(BRadius.xl),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.red.withValues(alpha: 0.3),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.phone_in_talk, color: Colors.white, size: 28),
-                    SizedBox(width: BSpace.x3),
-                    Expanded(
-                      child: Text(
-                        'Numéro d’Urgence Permanence',
-                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              const SizedBox(height: BSpace.x6),
+              const _SectionTitle('Questions fréquentes'),
+              faq.when(
+                loading: () => const SkeletonList(count: 3),
+                error: (error, _) => ErrorState(error: error, onRetry: () => ref.invalidate(faqProvider)),
+                data: (loaded) => Column(children: [
+                  if (loaded.cachedAt != null) ...[CachedDataNotice(cachedAt: loaded.cachedAt!), const SizedBox(height: BSpace.x2)],
+                  for (final item in loaded.data)
+                    Card(
+                      margin: const EdgeInsets.only(bottom: BSpace.x2),
+                      clipBehavior: Clip.antiAlias,
+                      child: ExpansionTile(
+                        title: Text(item.question, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                        childrenPadding: const EdgeInsets.fromLTRB(BSpace.x4, 0, BSpace.x4, BSpace.x4),
+                        children: [Text(item.answer, style: const TextStyle(color: BColors.textMuted, height: 1.45))],
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: BSpace.x2),
-                const Text(
-                  'Ligne ouverte 24h/24 en cas d’accident grave ou d’agression sur la voie publique.',
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
-                ),
-                const SizedBox(height: BSpace.x4),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.red.shade800,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BRadius.md)),
-                    ),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Appel d’urgence : +237 699 00 00 00')),
-                      );
-                    },
-                    icon: const Icon(Icons.call, color: Colors.red),
-                    label: const Text('+237 699 00 00 00', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                ),
-              ],
-            ),
+                ]),
+              ),
+            ]),
           ),
-
-          const SizedBox(height: BSpace.x6),
-          const Text('Canaux d’assistance', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: BSpace.x3),
-
-          _buildChannelCard(
-            context,
-            icon: Icons.chat,
-            color: const Color(0xFF25D366),
-            title: 'WhatsApp Permanence Syndicat',
-            subtitle: 'Réponse en moins de 15 minutes',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Ouverture WhatsApp : +237 670 00 00 00')),
-              );
-            },
-          ),
-          const SizedBox(height: BSpace.x3),
-
-          _buildChannelCard(
-            context,
-            icon: Icons.location_on,
-            color: BColors.brandBlue,
-            title: 'Points relais & Bureaux locaux',
-            subtitle: 'Yaoundé (Mokolo, Nlongkak) & Douala (Akwa)',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Permanences ouvertes du lundi au samedi de 8h à 18h.')),
-              );
-            },
-          ),
-
-          const SizedBox(height: BSpace.x6),
-          const Text('Foire Aux Questions (FAQ)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: BSpace.x3),
-
-          _buildFaqItem(
-            'Comment fonctionne la cotisation de 200 FCFA ?',
-            'Elle est prélevée chaque matin sur votre solde disponible si l’auto-débit est activé, ou payable manuellement. 200 FCFA par jour garantissent votre éligibilité aux tirages et votre couverture en cas d’accident.',
-          ),
-          _buildFaqItem(
-            'Quand ont lieu les tirages au sort ?',
-            'Les tirages ont lieu chaque fin de mois. La liste des conducteurs à jour est gelée publiquement et le tirage utilise un algorithme cryptographique SHA-256 entièrement vérifiable par tous.',
-          ),
-          _buildFaqItem(
-            'Que faire immédiatement en cas d’accident ?',
-            'Allez dans l’onglet « Solidarité », appuyez sur « Déclarer un sinistre » et indiquez l’hôpital. Rendez-vous aux urgences, conservez tous vos reçus et ordonnances pour prise en charge.',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChannelCard(
-    BuildContext context, {
-    required IconData icon,
-    required Color color,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(BRadius.lg),
-        border: Border.all(color: BColors.border),
-      ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.12),
-          child: Icon(icon, color: color),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-        onTap: onTap,
-      ),
+      ]),
     );
   }
+}
 
-  Widget _buildFaqItem(String question, String answer) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: BSpace.x3),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(BRadius.lg),
-        border: Border.all(color: BColors.border),
-      ),
-      child: ExpansionTile(
-        title: Text(question, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-            child: Text(answer, style: const TextStyle(fontSize: 13, height: 1.4, color: BColors.textSecondary)),
+class _ContactsCard extends StatelessWidget {
+  const _ContactsCard({required this.contacts});
+  final SupportContacts? contacts;
+
+  Future<void> _open(BuildContext context, Uri uri) async {
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication).catchError((_) => false);
+    if (!opened && context.mounted) showErrorSnackBar(context, 'Impossible d’ouvrir l’application correspondante.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = contacts;
+    if (c == null || c.isEmpty) {
+      return const Card(
+        child: ListTile(
+          leading: Icon(Icons.support_agent_rounded, color: BColors.primary500),
+          title: Text('Écrivez-nous', style: TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text('Créez une demande ci-dessous : l’équipe vous répond dans l’application et vous êtes notifié.'),
+        ),
+      );
+    }
+    String digits(String value) => value.replaceAll(RegExp(r'[^\d+]'), '');
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: [
+        if (c.emergencyPhone != null)
+          ListTile(
+            tileColor: BColors.danger50,
+            leading: const Icon(Icons.emergency_rounded, color: BColors.danger500),
+            title: const Text('Urgence', style: TextStyle(fontWeight: FontWeight.w800, color: BColors.danger500)),
+            subtitle: Text(c.emergencyPhone!),
+            trailing: const Icon(Icons.call_rounded, color: BColors.danger500),
+            onTap: () => _open(context, Uri(scheme: 'tel', path: digits(c.emergencyPhone!))),
           ),
-        ],
-      ),
+        if (c.phone != null)
+          ListTile(
+            leading: const Icon(Icons.call_outlined, color: BColors.primary500),
+            title: const Text('Appeler le support', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text([c.phone!, if (c.hours != null) c.hours!].join(' · ')),
+            onTap: () => _open(context, Uri(scheme: 'tel', path: digits(c.phone!))),
+          ),
+        if (c.whatsapp != null)
+          ListTile(
+            leading: const Icon(Icons.chat_outlined, color: BColors.growth600),
+            title: const Text('WhatsApp', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text(c.whatsapp!),
+            onTap: () => _open(context, Uri.parse('https://wa.me/${digits(c.whatsapp!).replaceAll('+', '')}')),
+          ),
+        if (c.email != null)
+          ListTile(
+            leading: const Icon(Icons.mail_outline_rounded, color: BColors.primary500),
+            title: const Text('E-mail', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text(c.email!),
+            onTap: () => _open(context, Uri(scheme: 'mailto', path: c.email!)),
+          ),
+      ]),
+    );
+  }
+}
+
+class _TicketBadge extends StatelessWidget {
+  const _TicketBadge({required this.status});
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = switch (status) {
+      'PENDING' => BadgeTone.warning,
+      'RESOLVED' => BadgeTone.success,
+      'CLOSED' => BadgeTone.neutral,
+      _ => BadgeTone.info,
+    };
+    return StatusBadge(label: supportStatusLabel(status), tone: tone);
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.title);
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: BSpace.x3),
+      child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
     );
   }
 }

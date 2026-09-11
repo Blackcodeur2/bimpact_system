@@ -9,10 +9,12 @@ import 'network/api_client.dart';
 import 'storage/device_identity.dart';
 import 'storage/local_cache.dart';
 import 'storage/token_store.dart';
+import 'sync/sync_queue.dart';
 
 /// Initialisés dans main() avant runApp puis injectés par override.
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) => throw UnimplementedError());
 final localCacheProvider = Provider<LocalCache>((ref) => throw UnimplementedError());
+final pendingActionStoreProvider = Provider<PendingActionStore>((ref) => throw UnimplementedError());
 final deviceIdentityProvider = Provider<DeviceIdentity>((ref) => throw UnimplementedError());
 
 final tokenStoreProvider = Provider<TokenStore>((ref) => TokenStore());

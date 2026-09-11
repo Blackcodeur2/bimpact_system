@@ -28,12 +28,40 @@ class CacheEntries extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [CacheEntries])
+/// Actions saisies hors connexion, envoyées dès le retour du réseau avec leur clé d'idempotence (cahier §12).
+/// Aucune opération financière n'y est jamais placée.
+@DataClassName('PendingActionRow')
+class PendingActions extends Table {
+  TextColumn get id => text()();
+  TextColumn get kind => text()();
+  TextColumn get label => text()();
+  TextColumn get method => text()();
+  TextColumn get path => text()();
+  TextColumn get body => text().nullable()();
+  TextColumn get idempotencyKey => text()();
+  DateTimeColumn get createdAt => dateTime()();
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+  DateTimeColumn get nextAttemptAt => dateTime()();
+  TextColumn get status => text()();
+  TextColumn get lastError => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DriftDatabase(tables: [CacheEntries, PendingActions])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? driftDatabase(name: 'benskin_impact'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (migrator, from, to) async {
+          if (from < 2) await migrator.createTable(pendingActions);
+        },
+      );
 }
 
 class DriftLocalCache implements LocalCache {

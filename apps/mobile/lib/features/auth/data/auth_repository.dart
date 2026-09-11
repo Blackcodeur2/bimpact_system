@@ -62,6 +62,27 @@ class AuthRepository {
     );
   }
 
+  /// Code PIN oublié — étape 1 : la réponse ne révèle pas si le numéro est inscrit.
+  Future<PendingRegistration> requestPinReset(String phone) {
+    return client.call(
+      (dio) => dio.post('/auth/pin-reset/request', data: {'phone': phone}),
+      (json) => PendingRegistration.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  /// Code PIN oublié — étape 2 : toutes les sessions existantes sont fermées et une nouvelle est ouverte.
+  Future<AuthResult> confirmPinReset({required String challengeId, required String code, required String newPin}) {
+    return client.call(
+      (dio) => dio.post('/auth/pin-reset/confirm', data: {
+        'challengeId': challengeId,
+        'code': code,
+        'newPin': newPin,
+        'device': device.toJson(),
+      }),
+      (json) => AuthResult.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
   Future<MeUser> me() async {
     final json = await client.call((dio) => dio.get('/me'), (json) => json as Map<String, dynamic>);
     await cache.write(_meKey, json);

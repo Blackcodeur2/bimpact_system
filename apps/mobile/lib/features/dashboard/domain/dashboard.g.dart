@@ -76,6 +76,7 @@ _Dashboard _$DashboardFromJson(Map<String, dynamic> json) => _Dashboard(
   eligibility: json['eligibility'] as Map<String, dynamic>?,
   nextDraw: json['nextDraw'] as Map<String, dynamic>?,
   training: json['training'] as Map<String, dynamic>?,
+  solidarity: json['solidarity'] as Map<String, dynamic>?,
   alerts: (json['alerts'] as List<dynamic>)
       .map((e) => DashboardAlert.fromJson(e as Map<String, dynamic>))
       .toList(),
@@ -91,6 +92,7 @@ Map<String, dynamic> _$DashboardToJson(_Dashboard instance) =>
       'eligibility': instance.eligibility,
       'nextDraw': instance.nextDraw,
       'training': instance.training,
+      'solidarity': instance.solidarity,
       'alerts': instance.alerts.map((e) => e.toJson()).toList(),
       'features': instance.features,
     };

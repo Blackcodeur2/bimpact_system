@@ -204,6 +204,11 @@ class NotificationsScreen extends ConsumerWidget {
     if (type.startsWith('DRAW')) return Icons.emoji_events_outlined;
     if (type.startsWith('TRAINING')) return Icons.school_outlined;
     if (type.startsWith('ACCIDENT')) return Icons.health_and_safety_outlined;
+    if (type.startsWith('SOLIDARITY')) return Icons.volunteer_activism_outlined;
+    if (type.startsWith('SECURITY')) return Icons.shield_outlined;
+    if (type.startsWith('SUPPORT')) return Icons.support_agent_rounded;
+    if (type.startsWith('PROJECT')) return Icons.lightbulb_outline_rounded;
+    if (type.startsWith('RECRUITMENT')) return Icons.work_outline_rounded;
     return Icons.notifications_none_rounded;
   }
 }

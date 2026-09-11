@@ -92,19 +92,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _forgotPin() {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Code PIN oublié'),
-        content: const Text(
-          'La réinitialisation du code PIN par SMS arrive dans une prochaine version. '
-          'En attendant, contactez le support BENSKIN IMPACT.',
-        ),
-        actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Compris'))],
-      ),
-    );
-  }
+  void _forgotPin() => context.push(Routes.pinReset);
 
   @override
   Widget build(BuildContext context) {

@@ -42,7 +42,7 @@ export class DrawsController {
   @Public()
   @Get(':id/audit')
   audit(@Param('id', ParseUUIDPipe) id: string) {
-    return this.draws.audit(id);
+    return this.draws.auditReport(id);
   }
 }
 

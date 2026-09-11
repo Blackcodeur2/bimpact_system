@@ -48,6 +48,12 @@ pnpm db:deploy
 pnpm db:seed
 ```
 
+Contenu pédagogique de la formation (modules, leçons, quiz — aucune donnée de membre fictive) :
+
+```bash
+pnpm --filter @benskin/api training:seed
+```
+
 ```bash
 pnpm api:dev
 ```
@@ -108,4 +114,4 @@ cd apps/mobile && flutter test
 - Montants en `NUMERIC` côté base et en chaînes décimales dans l'API ; jamais de `float`.
 - Aucune opération financière n'est affichée comme réussie avant confirmation du serveur.
 - Chaque route déclare explicitement sa politique d'accès ; sans déclaration, l'accès est refusé.
-- Les modules non encore livrés sont affichés comme « bientôt disponibles », jamais simulés avec de fausses données.
+- Aucune donnée fictive n'est présentée comme réelle ; le fonds de solidarité ne prélève que les membres ayant adhéré volontairement.

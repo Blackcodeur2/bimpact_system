@@ -4,6 +4,8 @@ import { RequirePermissions } from '../../common/access/access.decorators';
 import { AuthContext, Ctx, CurrentAuth, RequestContext } from '../../common/request-context';
 import { ContributionsModule } from '../contributions/contributions.module';
 import { DrawsModule } from '../draws/draws.module';
+import { SolidarityModule } from '../solidarity/solidarity.module';
+import { TrainingModule } from '../training/training.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { DashboardService } from './dashboard.service';
 import { UpdateMeDto } from './users.dto';
@@ -38,7 +40,7 @@ export class MeController {
 }
 
 @Module({
-  imports: [WalletModule, ContributionsModule, DrawsModule],
+  imports: [WalletModule, ContributionsModule, DrawsModule, TrainingModule, SolidarityModule],
   controllers: [MeController],
   providers: [UsersService, DashboardService],
   exports: [UsersService],

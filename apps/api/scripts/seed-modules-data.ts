@@ -1,409 +1,311 @@
-import { PrismaClient, LessonContentType, AccidentSeverity, AccidentClaimStatus, ProjectStatus } from '@prisma/client';
+import { LessonContentType, PrismaClient } from '@prisma/client';
 
-export async function seedModulesData(prisma: PrismaClient) {
-  console.log('--- Initialisation des données des modules métier ---');
+/**
+ * Contenu pédagogique de démarrage : 6 modules, leçons écrites et quiz.
+ * À relire et valider par l'équipe programme avant la mise en production.
+ *
+ * Ce script ne crée AUCUNE donnée de démonstration (projet, dossier d'accident, certificat, offre d'emploi) :
+ * ces éléments naissent uniquement des parcours réels des membres, des entreprises et du comité.
+ * Les leçons audio seront ajoutées quand des enregistrements réels existeront.
+ *
+ *   pnpm --filter @benskin/api training:seed
+ */
+const modules = [
+  {
+    month: 1,
+    title: 'Entrepreneuriat & posture du leader',
+    description: 'Développer l’état d’esprit d’un chef d’entreprise et passer du guidon à la gestion.',
+    durationMinutes: 45,
+    iconName: 'psychology',
+    lessons: [
+      {
+        title: 'Passer de conducteur à entrepreneur',
+        description: 'Comprendre la différence entre une recette journalière et une activité rentable.',
+        durationMinutes: 12,
+        content: `Passer de conducteur à entrepreneur
 
-  // 1. MODULES DE FORMATION (6 MOIS)
-  const modulesData = [
-    {
-      month: 1,
-      title: 'Entrepreneuriat & Posture du Leader',
-      description: 'Développer l’état d’esprit d’un chef d’entreprise et transitionner du guidon à la gestion.',
-      durationMinutes: 90,
-      order: 1,
-      iconName: 'psychology',
-      lessons: [
-        {
-          title: 'Passer de conducteur à entrepreneur',
-          description: 'Comprendre la différence entre générer une recette journalière et bâtir un actif rentable.',
-          durationMinutes: 12,
-          contentType: LessonContentType.AUDIO,
-          audioUrl: 'https://assets.benskinimpact.cm/audio/m1_lesson1.mp3',
-          markdownContent: `### Passer de conducteur à entrepreneur\n\nChaque jour au Cameroun, des milliers de conducteurs génèrent entre 5 000 et 15 000 FCFA de recettes brutes. Pourtant, à la fin du mois, beaucoup se retrouvent sans épargne.\n\n#### 3 principes essentiels :\n1. **Séparer l'argent de la moto de son argent personnel** : Votre moto est une micro-entreprise. Les recettes doivent d'abord payer l'amortissement, le carburant et l'entretien avant tout prélèvement.\n2. **La discipline de la cotisation quotidienne** : Mettre de côté 200 FCFA par jour crée la base de solidarité et d'accès au capital de demain.\n3. **Visualiser son projet futur** : La moto est un tremplin, pas une fin en soi. Quel atelier, quel commerce ou quelle flotte voulez-vous créer dans 1 an ?`,
-          order: 1,
-        },
-        {
-          title: 'Gestion du temps et productivité urbaine',
-          description: 'Optimiser ses heures de pointe à Yaoundé et Douala sans s’épuiser physiquement.',
-          durationMinutes: 15,
-          contentType: LessonContentType.TEXT,
-          audioUrl: null,
-          markdownContent: `### Gestion du temps et rentabilité par heure\n\nÊtre sur la route 14h par jour augmente les risques d'accident et d'usure mécanique sans doubler le revenu net.\n\n* **Heures chaudes** : 06h30-09h00 (trajets domicile-travail) et 17h00-20h30 (retours des marchés et bureaux).\n* **Heures creuses rentables** : Livraisons programmées de colis et contrats réguliers avec commerçants.\n* **Repos stratégique** : 1h de pause aux heures mortes (13h-14h) permet de maintenir la vigilance.`,
-          order: 2,
-        },
-      ],
-      quiz: {
-        title: 'Validation Mois 1 — Esprit d’Entreprise',
-        passScore: 70,
-        questions: [
-          {
-            question: 'Quelle est la première règle de gestion pour un conducteur entrepreneur ?',
-            options: ['Dépenser la recette dès le soir', 'Séparer la caisse de l’activité de ses dépenses personnelles', 'Rouler 18h sans pause', 'Ne jamais entretenir sa moto'],
-            correctIndex: 1,
-            explanation: 'La séparation des finances personnelles et professionnelles est le socle de toute entreprise pérenne.',
-            order: 1,
-          },
-          {
-            question: 'À quoi sert la contribution de 200 FCFA / jour ?',
-            options: ['À enrichir une banque', 'À financer les projets des conducteurs, la solidarité et les tirages', 'À payer une amende', 'À rien'],
-            correctIndex: 1,
-            explanation: 'La contribution quotidienne alimente le fonds de solidarité accident et les dotations entrepreneuriales vérifiables.',
-            order: 2,
-          },
-        ],
-      },
-    },
-    {
-      month: 2,
-      title: 'Étude de marché & Clientèle locale',
-      description: 'Identifier les besoins non satisfaits à Akwa, Bonabéri, Mokolo ou Bastos.',
-      durationMinutes: 110,
-      order: 2,
-      iconName: 'storefront',
-      lessons: [
-        {
-          title: 'Identifier une opportunité de quartier',
-          description: 'Analyser la concurrence et les manques criants autour de votre carrefour.',
-          durationMinutes: 15,
-          contentType: LessonContentType.AUDIO,
-          audioUrl: 'https://assets.benskinimpact.cm/audio/m2_lesson1.mp3',
-          markdownContent: `### Identifier une opportunité de quartier\n\nChaque carrefour a ses besoins spécifiques : manque d'un réparateur de confiance ouvert tard, pénurie de pièces d'usure rapide de qualité (câbles d'embrayage, chambres à air HD), ou absence de service de livraison frigorifique locale.`,
-          order: 1,
-        },
-      ],
-      quiz: {
-        title: 'Validation Mois 2 — Étude de marché',
-        passScore: 70,
-        questions: [
-          {
-            question: 'Comment valider une idée d’entreprise avant d’investir ?',
-            options: ['Emprunter immédiatement au taux fort', 'Interroger ses clients réguliers sur leurs réels problèmes', 'Attendre sans rien faire', 'Copier sans réfléchir'],
-            correctIndex: 1,
-            explanation: 'L’écoute client est la méthode la plus sûre et la moins coûteuse pour vérifier la demande.',
-            order: 1,
-          },
-        ],
-      },
-    },
-    {
-      month: 3,
-      title: 'Business Model & Rentabilité',
-      description: 'Construire une offre claire et calculer ses marges bénéficiaires.',
-      durationMinutes: 120,
-      order: 3,
-      iconName: 'trending_up',
-      lessons: [
-        {
-          title: 'Calculer son seuil de rentabilité',
-          description: 'Charges fixes, charges variables et bénéfice net mensuel.',
-          durationMinutes: 18,
-          contentType: LessonContentType.AUDIO,
-          audioUrl: 'https://assets.benskinimpact.cm/audio/m3_lesson1.mp3',
-          markdownContent: `### Calculer son seuil de rentabilité\n\nLe seuil de rentabilité est le chiffre d'affaires minimum nécessaire pour ne pas perdre d'argent. Dès que ce seuil est franchi, chaque franc supplémentaire devient un profit net.`,
-          order: 1,
-        },
-      ],
-      quiz: {
-        title: 'Validation Mois 3 — Modèle Économique',
-        passScore: 70,
-        questions: [
-          {
-            question: 'Qu’est-ce qu’une charge fixe ?',
-            options: ['Une dépense qui ne varie pas avec le volume d’activité (ex: loyer du local)', 'Le prix de l’essence', 'Un pourboire', 'Une réparation imprévue'],
-            correctIndex: 0,
-            explanation: 'Le loyer ou l’assurance restent dus chaque mois, quel que soit le niveau des ventes.',
-            order: 1,
-          },
-        ],
-      },
-    },
-    {
-      month: 4,
-      title: 'Finance & Trésorerie',
-      description: 'Tenir un livre de caisse simple et sécuriser ses liquidités.',
-      durationMinutes: 90,
-      order: 4,
-      iconName: 'account_balance_wallet',
-      lessons: [
-        {
-          title: 'Le cahier de recettes et dépenses',
-          description: 'L’outil indispensable pour obtenir un financement Benskin.',
-          durationMinutes: 14,
-          contentType: LessonContentType.TEXT,
-          audioUrl: null,
-          markdownContent: `### Le cahier de caisse\n\nNotez chaque soir : 1. Entrées de trésorerie (recettes clients), 2. Sorties (achats de stocks, carburant, salaires), 3. Solde réel en poche.`,
-          order: 1,
-        },
-      ],
-      quiz: {
-        title: 'Validation Mois 4 — Gestion Financière',
-        passScore: 70,
-        questions: [
-          {
-            question: 'Pourquoi tenir un cahier de caisse rigoureux ?',
-            options: ['Pour payer plus de taxes', 'Pour prouver sa rentabilité lors de la demande de subvention Benskin', 'Pour perdre du temps', 'C’est inutile'],
-            correctIndex: 1,
-            explanation: 'Un historique financier vérifiable prouve le sérieux du porteur de projet.',
-            order: 1,
-          },
-        ],
-      },
-    },
-    {
-      month: 5,
-      title: 'Marketing & Vente Locale',
-      description: 'Fidéliser sa clientèle et utiliser les canaux numériques (WhatsApp Business).',
-      durationMinutes: 80,
-      order: 5,
-      iconName: 'campaign',
-      lessons: [
-        {
-          title: 'WhatsApp Business pour commerçants et transporteurs',
-          description: 'Créer son catalogue et gérer les commandes clients.',
-          durationMinutes: 15,
-          contentType: LessonContentType.AUDIO,
-          audioUrl: 'https://assets.benskinimpact.cm/audio/m5_lesson1.mp3',
-          markdownContent: `### Vendre grâce au numérique\n\nUn groupe de diffusion WhatsApp bien géré permet de sécuriser des courses régulières et des livraisons de colis récurrentes.`,
-          order: 1,
-        },
-      ],
-      quiz: {
-        title: 'Validation Mois 5 — Marketing',
-        passScore: 70,
-        questions: [
-          {
-            question: 'Quel est le meilleur outil de communication direct pour une PME au Cameroun ?',
-            options: ['Un panneau d’autoroute très cher', 'WhatsApp Business avec catalogue produit', 'Un fax', 'La télévision'],
-            correctIndex: 1,
-            explanation: 'WhatsApp est le canal universel et instantané pour échanger avec ses clients au Cameroun.',
-            order: 1,
-          },
-        ],
-      },
-    },
-    {
-      month: 6,
-      title: 'Management & Recrutement',
-      description: 'Créer des emplois et recruter d’autres conducteurs ou assistants.',
-      durationMinutes: 100,
-      order: 6,
-      iconName: 'groups',
-      lessons: [
-        {
-          title: 'Déléguer et recruter un collaborateur',
-          description: 'Fixer des règles claires et un contrat de confiance.',
-          durationMinutes: 20,
-          contentType: LessonContentType.AUDIO,
-          audioUrl: 'https://assets.benskinimpact.cm/audio/m6_lesson1.mp3',
-          markdownContent: `### Devenir employeur responsable\n\nLe passage à une flotte de 3 ou 5 motos exige des contrats écrits, un suivi de maintenance préventive et le respect mutuel.`,
-          order: 1,
-        },
-      ],
-      quiz: {
-        title: 'Validation Mois 6 — Examen Final Certification',
-        passScore: 80,
-        questions: [
-          {
-            question: 'Quelle est la clé d’une relation saine avec un conducteur employé ?',
-            options: ['Ne rien signer', 'Fixer des objectifs de versement clairs et assurer la maintenance de la moto', 'Garder la moto sans vidange', 'Changer les règles chaque semaine'],
-            correctIndex: 1,
-            explanation: 'La clarté contractuelle et un engin bien entretenu garantissent la fidélité et la sécurité de l’employé.',
-            order: 1,
-          },
-        ],
-      },
-    },
-  ];
+Une recette encaissée n’est pas un bénéfice. Avant de parler de profit, il faut payer ce que coûte l’activité : carburant, entretien, remboursement ou location de la moto.
 
-  for (const m of modulesData) {
-    const savedModule = await prisma.courseModule.upsert({
-      where: { month: m.month },
+Trois principes :
+1. Séparer l’argent de l’activité de l’argent personnel. La moto est une petite entreprise : ses recettes paient d’abord ses charges.
+2. Mettre de côté un peu chaque jour. La régularité compte plus que le montant.
+3. Se fixer un projet. La moto peut être un tremplin : quel commerce, atelier ou service voulez-vous créer ?`,
+        keyPoints: ['Recette ≠ bénéfice', 'Séparer caisse et dépenses personnelles', 'Épargner régulièrement', 'Se fixer un projet'],
+      },
+      {
+        title: 'Gérer son temps et sa sécurité',
+        description: 'Organiser ses journées sans s’épuiser.',
+        durationMinutes: 10,
+        content: `Gérer son temps et sa sécurité
+
+Rouler plus longtemps n’augmente pas toujours le revenu net : la fatigue augmente le risque d’accident et l’usure de la moto.
+
+- Repérez vos heures les plus rentables et concentrez-y votre activité.
+- Prévoyez des pauses pour rester vigilant.
+- Notez chaque soir vos recettes et vos dépenses : vous verrez quelles journées rapportent vraiment.`,
+        keyPoints: ['La fatigue coûte cher', 'Repérer ses heures rentables', 'Noter recettes et dépenses'],
+      },
+    ],
+    quiz: {
+      title: 'Validation du module 1 — Esprit d’entreprise',
+      passScore: 70,
+      questions: [
+        {
+          question: 'Quelle est la première règle de gestion pour un conducteur entrepreneur ?',
+          options: ['Dépenser la recette dès le soir', 'Séparer l’argent de l’activité de ses dépenses personnelles', 'Rouler sans pause', 'Reporter l’entretien de la moto'],
+          correctIndex: 1,
+          explanation: 'Séparer les finances de l’activité et les finances personnelles est la base de toute entreprise durable.',
+        },
+        {
+          question: 'À quoi sert la contribution quotidienne au programme ?',
+          options: [
+            'À rien de précis',
+            'À constituer un historique régulier qui ouvre l’accès aux tirages et au parcours entrepreneurial',
+            'À payer une amende',
+            'À obtenir automatiquement un financement',
+          ],
+          correctIndex: 1,
+          explanation: 'Les contributions régulières rendent éligible aux tirages du programme ; aucun financement n’est automatique.',
+        },
+      ],
+    },
+  },
+  {
+    month: 2,
+    title: 'Étude de marché & clientèle locale',
+    description: 'Identifier les besoins réels des clients autour de soi.',
+    durationMinutes: 40,
+    iconName: 'storefront',
+    lessons: [
+      {
+        title: 'Identifier une opportunité de quartier',
+        description: 'Observer la concurrence et les besoins non satisfaits.',
+        durationMinutes: 15,
+        content: `Identifier une opportunité de quartier
+
+Chaque quartier a ses besoins : un service qui manque le soir, un produit difficile à trouver, un travail mal fait par la concurrence.
+
+Méthode simple :
+1. Observez pendant une semaine : qui achète quoi, où, à quelle heure ?
+2. Interrogez au moins dix clients potentiels sur leurs vrais problèmes.
+3. Notez les prix pratiqués par les concurrents et ce que les clients leur reprochent.`,
+        keyPoints: ['Observer avant d’investir', 'Interroger au moins dix clients', 'Étudier les concurrents'],
+      },
+    ],
+    quiz: {
+      title: 'Validation du module 2 — Étude de marché',
+      passScore: 70,
+      questions: [
+        {
+          question: 'Comment vérifier une idée d’entreprise avant d’investir ?',
+          options: ['Emprunter immédiatement', 'Interroger des clients sur leurs vrais besoins', 'Attendre sans rien faire', 'Copier un voisin sans réfléchir'],
+          correctIndex: 1,
+          explanation: 'Écouter les clients est la manière la plus sûre et la moins coûteuse de vérifier qu’une demande existe.',
+        },
+      ],
+    },
+  },
+  {
+    month: 3,
+    title: 'Modèle économique & rentabilité',
+    description: 'Construire une offre claire et calculer ses marges.',
+    durationMinutes: 40,
+    iconName: 'trending_up',
+    lessons: [
+      {
+        title: 'Calculer son seuil de rentabilité',
+        description: 'Charges fixes, charges variables et bénéfice.',
+        durationMinutes: 18,
+        content: `Calculer son seuil de rentabilité
+
+Le seuil de rentabilité est le chiffre d’affaires minimum pour ne pas perdre d’argent.
+
+- Charges fixes : elles ne changent pas avec l’activité (loyer, abonnement).
+- Charges variables : elles augmentent avec les ventes (marchandises, carburant).
+- Marge = prix de vente − coût variable.
+
+Seuil de rentabilité (en nombre de ventes) = charges fixes du mois ÷ marge par vente.`,
+        keyPoints: ['Charges fixes et variables', 'Marge par vente', 'Seuil = charges fixes ÷ marge'],
+      },
+    ],
+    quiz: {
+      title: 'Validation du module 3 — Modèle économique',
+      passScore: 70,
+      questions: [
+        {
+          question: 'Qu’est-ce qu’une charge fixe ?',
+          options: ['Une dépense qui ne varie pas avec le volume d’activité, comme le loyer', 'Le prix de l’essence', 'Un pourboire', 'Une réparation imprévue'],
+          correctIndex: 0,
+          explanation: 'Le loyer reste dû chaque mois, quel que soit le niveau des ventes.',
+        },
+      ],
+    },
+  },
+  {
+    month: 4,
+    title: 'Finance & trésorerie',
+    description: 'Tenir un cahier de caisse et sécuriser ses liquidités.',
+    durationMinutes: 35,
+    iconName: 'account_balance_wallet',
+    lessons: [
+      {
+        title: 'Le cahier de recettes et de dépenses',
+        description: 'L’outil de base pour piloter son activité.',
+        durationMinutes: 14,
+        content: `Le cahier de caisse
+
+Chaque soir, notez :
+1. les entrées d’argent (ventes, courses) ;
+2. les sorties (achats, carburant, salaires) ;
+3. l’argent réellement disponible.
+
+Au bout d’un mois, vous savez si l’activité gagne de l’argent, et vous pouvez le montrer à un partenaire financier.`,
+        keyPoints: ['Noter chaque soir', 'Entrées, sorties, solde', 'Prouver sa rentabilité'],
+      },
+    ],
+    quiz: {
+      title: 'Validation du module 4 — Gestion financière',
+      passScore: 70,
+      questions: [
+        {
+          question: 'Pourquoi tenir un cahier de caisse rigoureux ?',
+          options: ['Pour perdre du temps', 'Pour connaître sa rentabilité réelle et pouvoir la justifier', 'Pour payer plus de taxes', 'C’est inutile'],
+          correctIndex: 1,
+          explanation: 'Un historique chiffré permet de piloter l’activité et de présenter un dossier sérieux.',
+        },
+      ],
+    },
+  },
+  {
+    month: 5,
+    title: 'Marketing & vente locale',
+    description: 'Fidéliser sa clientèle et utiliser les outils numériques simples.',
+    durationMinutes: 35,
+    iconName: 'campaign',
+    lessons: [
+      {
+        title: 'Fidéliser ses clients',
+        description: 'Transformer un client occasionnel en client régulier.',
+        durationMinutes: 15,
+        content: `Fidéliser ses clients
+
+Un client satisfait revient et en parle autour de lui.
+
+- Soyez ponctuel et tenez vos promesses.
+- Gardez le contact : une messagerie de groupe permet d’annoncer vos produits ou disponibilités.
+- Demandez l’avis de vos clients et corrigez ce qui ne va pas.`,
+        keyPoints: ['Ponctualité et fiabilité', 'Garder le contact', 'Écouter les avis'],
+      },
+    ],
+    quiz: {
+      title: 'Validation du module 5 — Marketing',
+      passScore: 70,
+      questions: [
+        {
+          question: 'Quel est le meilleur moyen de faire revenir un client ?',
+          options: ['Changer ses prix chaque semaine', 'Tenir ses promesses et garder le contact', 'Ignorer ses remarques', 'Ne jamais répondre aux messages'],
+          correctIndex: 1,
+          explanation: 'La fiabilité et le suivi créent la confiance, qui fait revenir les clients.',
+        },
+      ],
+    },
+  },
+  {
+    month: 6,
+    title: 'Management & recrutement',
+    description: 'Créer des emplois et encadrer une équipe.',
+    durationMinutes: 40,
+    iconName: 'groups',
+    lessons: [
+      {
+        title: 'Recruter et encadrer un collaborateur',
+        description: 'Fixer des règles claires et un cadre de confiance.',
+        durationMinutes: 20,
+        content: `Devenir employeur responsable
+
+Recruter, c’est s’engager envers une personne.
+
+- Décrivez clairement le poste, les horaires et la rémunération.
+- Mettez les règles par écrit et respectez la réglementation du travail.
+- Faites un point régulier : ce qui va, ce qui doit s’améliorer.`,
+        keyPoints: ['Poste clairement décrit', 'Règles écrites et légales', 'Points réguliers'],
+      },
+    ],
+    quiz: {
+      title: 'Validation du module 6 — Examen final',
+      passScore: 80,
+      questions: [
+        {
+          question: 'Quelle est la clé d’une relation saine avec un collaborateur ?',
+          options: ['Ne rien mettre par écrit', 'Des règles claires, écrites et respectées par les deux parties', 'Changer les règles chaque semaine', 'Ne jamais faire de point'],
+          correctIndex: 1,
+          explanation: 'Un cadre clair et respecté protège l’employeur comme le collaborateur.',
+        },
+      ],
+    },
+  },
+];
+
+export async function seedTrainingContent(prisma: PrismaClient) {
+  for (const [index, module] of modules.entries()) {
+    const saved = await prisma.courseModule.upsert({
+      where: { month: module.month },
       create: {
-        month: m.month,
-        title: m.title,
-        description: m.description,
-        durationMinutes: m.durationMinutes,
-        order: m.order,
-        iconName: m.iconName,
+        month: module.month,
+        title: module.title,
+        description: module.description,
+        durationMinutes: module.durationMinutes,
+        order: index + 1,
+        iconName: module.iconName,
       },
-      update: {
-        title: m.title,
-        description: m.description,
-        durationMinutes: m.durationMinutes,
-      },
+      update: { title: module.title, description: module.description, durationMinutes: module.durationMinutes, iconName: module.iconName },
     });
 
-    for (const l of m.lessons) {
-      const existingLesson = await prisma.courseLesson.findFirst({
-        where: { moduleId: savedModule.id, order: l.order },
-      });
-      if (!existingLesson) {
-        await prisma.courseLesson.create({
-          data: {
-            moduleId: savedModule.id,
-            title: l.title,
-            description: l.description,
-            durationMinutes: l.durationMinutes,
-            contentType: l.contentType,
-            audioUrl: l.audioUrl,
-            markdownContent: l.markdownContent,
-            order: l.order,
-          },
-        });
-      }
+    for (const [lessonIndex, lesson] of module.lessons.entries()) {
+      const order = lessonIndex + 1;
+      const data = {
+        title: lesson.title,
+        description: lesson.description,
+        durationMinutes: lesson.durationMinutes,
+        contentType: LessonContentType.TEXT,
+        audioUrl: null,
+        markdownContent: lesson.content,
+        keyPoints: lesson.keyPoints,
+      };
+      const existing = await prisma.courseLesson.findFirst({ where: { moduleId: saved.id, order } });
+      if (existing) await prisma.courseLesson.update({ where: { id: existing.id }, data });
+      else await prisma.courseLesson.create({ data: { ...data, moduleId: saved.id, order } });
     }
 
-    const existingQuiz = await prisma.quiz.findFirst({ where: { moduleId: savedModule.id } });
+    // Un quiz déjà passé par des membres n'est pas réécrit : ses résultats doivent rester interprétables.
+    const existingQuiz = await prisma.quiz.findFirst({ where: { moduleId: saved.id } });
     if (!existingQuiz) {
-      const quiz = await prisma.quiz.create({
+      await prisma.quiz.create({
         data: {
-          moduleId: savedModule.id,
-          title: m.quiz.title,
-          passScore: m.quiz.passScore,
-        },
-      });
-
-      for (const q of m.quiz.questions) {
-        await prisma.quizQuestion.create({
-          data: {
-            quizId: quiz.id,
-            question: q.question,
-            options: q.options,
-            correctIndex: q.correctIndex,
-            explanation: q.explanation,
-            order: q.order,
+          moduleId: saved.id,
+          title: module.quiz.title,
+          passScore: module.quiz.passScore,
+          questions: {
+            create: module.quiz.questions.map((question, questionIndex) => ({
+              question: question.question,
+              options: question.options,
+              correctIndex: question.correctIndex,
+              explanation: question.explanation,
+              order: questionIndex + 1,
+            })),
           },
-        });
-      }
-    }
-  }
-  console.log('[OK] 6 modules de formation, leçons et quiz initialisés');
-
-  // 2. OFFRES DE RECRUTEMENT PARTENAIRES
-  const jobsData = [
-    {
-      title: 'Conducteur de livraison express (E-Commerce)',
-      company: 'Jumia / Logistique Cameroun',
-      sector: 'Livraison Urbaine',
-      location: 'Douala (Akwa, Bonapriso, Deido)',
-      salaryHint: '120 000 - 180 000 FCFA / mois',
-      requirements: 'Permis A valide, CNI, téléphone smartphone Android, bonne connaissance de Douala.',
-      description: 'Prise en charge de tournées quotidiennes de distribution de colis pour des clients e-commerce. Carburant et entretien partiel pris en charge par le partenaire.',
-    },
-    {
-      title: 'Chef d’équipe flotte 5 motos',
-      company: 'Transport Express Sud',
-      sector: 'Gestion de Flotte',
-      location: 'Yaoundé (Mvan, Nsam)',
-      salaryHint: '150 000 FCFA + primes sur objectifs',
-      requirements: 'Conducteur certifié Benskin Impact, minimum 3 ans d’expérience, rigueur financière.',
-      description: 'Supervision des vérifications techniques quotidiennes, encadrement des conducteurs juniors et transmission des états de versement journaliers.',
-    },
-    {
-      title: 'Livreur courses alimentaires & restaurants',
-      company: 'Glotelho Quick Express',
-      sector: 'Restauration & Retail',
-      location: 'Yaoundé (Bastos, Omnisports, Melen)',
-      salaryHint: '4 000 à 7 000 FCFA / jour garanti',
-      requirements: 'Moto en excellent état avec top-case isotherme (fourni sous caution), ponctualité exemplaire.',
-      description: 'Livraison de commandes express en moins de 35 minutes au cœur de Yaoundé. Horaires flexibles.',
-    },
-  ];
-
-  for (const j of jobsData) {
-    const existing = await prisma.jobOffer.findFirst({ where: { title: j.title } });
-    if (!existing) {
-      await prisma.jobOffer.create({ data: j });
-    }
-  }
-  console.log('[OK] Offres de recrutement partenaires initialisées');
-
-  // 3. PROJET TEST & SINISTRE ACCIDENT POUR L'UTILISATEUR TEST
-  const testUser = await prisma.user.findUnique({ where: { phone: '+237690000001' } });
-  if (testUser) {
-    // Projet d'entreprise
-    const existingProject = await prisma.project.findFirst({ where: { userId: testUser.id } });
-    if (!existingProject) {
-      const proj = await prisma.project.create({
-        data: {
-          userId: testUser.id,
-          title: 'Atelier mécanique moderne & Pièces détachées d’origine',
-          sector: 'Mécanique & Commerce',
-          city: 'Yaoundé',
-          locationDetail: 'Carrefour Emombo, Rue Principale',
-          estimatedBudget: 1500000,
-          personalContribution: 300000,
-          grantRequested: 1200000,
-          status: ProjectStatus.UNDER_REVIEW,
-          description: 'Création d’un atelier équipé avec outillage professionnel pneumatique et stock de pièces certifiées (bougies NGK, kits chaînes renforcés, pneus tubeless). L’atelier permettra de former 2 apprentis conducteurs dès la première année.',
-          businessPlan: {
-            monthlyRevenueEstimate: 450000,
-            monthlyCostsEstimate: 210000,
-            netMonthlyMargin: 240000,
-            jobsCreated: 3,
-          },
-          reviewFeedback: 'Dossier bien documenté. En cours d’instruction par le comité de dotation.',
         },
       });
-
-      await prisma.projectMilestone.createMany({
-        data: [
-          { projectId: proj.id, title: 'Validation du bail commercial et aménagement de l’atelier', amount: 400000, isCompleted: true, completedAt: new Date() },
-          { projectId: proj.id, title: 'Acquisition du stock initial de pièces motos', amount: 500000, isCompleted: false },
-          { projectId: proj.id, title: 'Recrutement et formation des 2 apprentis', amount: 300000, isCompleted: false },
-        ],
-      });
-      console.log('[OK] Projet d’entreprise test initialisé avec jalons');
-    }
-
-    // Dossier d'accident / solidarité
-    const existingClaim = await prisma.accidentClaim.findFirst({ where: { userId: testUser.id } });
-    if (!existingClaim) {
-      const claimDate = new Date();
-      claimDate.setDate(claimDate.getDate() - 10);
-
-      await prisma.accidentClaim.create({
-        data: {
-          userId: testUser.id,
-          reference: 'ACC-2026-YDE-042',
-          date: claimDate,
-          location: 'Yaoundé, Axe Carrefour Nlongkak',
-          severity: AccidentSeverity.LIGHT,
-          thirdPartyInvolved: true,
-          hospitalName: 'Hôpital Central de Yaoundé (Urgences)',
-          description: 'Accrochage avec un véhicule particulier à faible allure. Entorse de la cheville droite et dégâts sur le rétroviseur et le guidon. Soins d’urgence et radiographie réalisés le jour même.',
-          status: AccidentClaimStatus.APPROVED,
-          requestedAmount: 45000,
-          approvedAmount: 45000,
-          reviewNotes: 'Dossier complet, factures validées par le médecin conseil de la mutuelle. Prise en charge 100% accordée.',
-        },
-      });
-      console.log('[OK] Dossier d’assistance accident test initialisé (APPROVED, 45 000 FCFA)');
-    }
-
-    // Certificat test
-    const existingCert = await prisma.certification.findFirst({ where: { userId: testUser.id } });
-    if (!existingCert) {
-      await prisma.certification.create({
-        data: {
-          userId: testUser.id,
-          certificateNumber: 'CERT-BENSKIN-2026-0892',
-          title: 'Certificat d’Entrepreneur Responsable & Sécurité Routière',
-          issuedAt: new Date(),
-          verificationHash: 'b4a89f92e31c4b778a6234f9a0c7e2b1',
-        },
-      });
-      console.log('[OK] Certificat d’entrepreneur test initialisé');
     }
   }
 }
 
 if (require.main === module) {
   const prisma = new PrismaClient();
-  seedModulesData(prisma)
-    .then(() => console.log('Seed des modules terminé avec succès.'))
-    .catch((e) => {
-      console.error(e);
+  seedTrainingContent(prisma)
+    .then(() => console.log(`Contenu de formation à jour : ${modules.length} modules.`))
+    .catch((error) => {
+      console.error(error);
       process.exitCode = 1;
     })
     .finally(() => prisma.$disconnect());

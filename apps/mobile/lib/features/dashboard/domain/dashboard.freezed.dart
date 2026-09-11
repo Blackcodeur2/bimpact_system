@@ -1157,7 +1157,7 @@ $AlertActionCopyWith<$Res>? get action {
 /// @nodoc
 mixin _$Dashboard {
 
- DateTime get generatedAt; DashboardUser get user; WalletSummary get wallet; Map<String, dynamic>? get contribution; Map<String, dynamic>? get eligibility; Map<String, dynamic>? get nextDraw; Map<String, dynamic>? get training; List<DashboardAlert> get alerts; Map<String, bool> get features;
+ DateTime get generatedAt; DashboardUser get user; WalletSummary get wallet; Map<String, dynamic>? get contribution; Map<String, dynamic>? get eligibility; Map<String, dynamic>? get nextDraw; Map<String, dynamic>? get training; Map<String, dynamic>? get solidarity; List<DashboardAlert> get alerts; Map<String, bool> get features;
 /// Create a copy of Dashboard
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1170,16 +1170,16 @@ $DashboardCopyWith<Dashboard> get copyWith => _$DashboardCopyWithImpl<Dashboard>
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Dashboard&&(identical(other.generatedAt, generatedAt) || other.generatedAt == generatedAt)&&(identical(other.user, user) || other.user == user)&&(identical(other.wallet, wallet) || other.wallet == wallet)&&const DeepCollectionEquality().equals(other.contribution, contribution)&&const DeepCollectionEquality().equals(other.eligibility, eligibility)&&const DeepCollectionEquality().equals(other.nextDraw, nextDraw)&&const DeepCollectionEquality().equals(other.training, training)&&const DeepCollectionEquality().equals(other.alerts, alerts)&&const DeepCollectionEquality().equals(other.features, features));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Dashboard&&(identical(other.generatedAt, generatedAt) || other.generatedAt == generatedAt)&&(identical(other.user, user) || other.user == user)&&(identical(other.wallet, wallet) || other.wallet == wallet)&&const DeepCollectionEquality().equals(other.contribution, contribution)&&const DeepCollectionEquality().equals(other.eligibility, eligibility)&&const DeepCollectionEquality().equals(other.nextDraw, nextDraw)&&const DeepCollectionEquality().equals(other.training, training)&&const DeepCollectionEquality().equals(other.solidarity, solidarity)&&const DeepCollectionEquality().equals(other.alerts, alerts)&&const DeepCollectionEquality().equals(other.features, features));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,generatedAt,user,wallet,const DeepCollectionEquality().hash(contribution),const DeepCollectionEquality().hash(eligibility),const DeepCollectionEquality().hash(nextDraw),const DeepCollectionEquality().hash(training),const DeepCollectionEquality().hash(alerts),const DeepCollectionEquality().hash(features));
+int get hashCode => Object.hash(runtimeType,generatedAt,user,wallet,const DeepCollectionEquality().hash(contribution),const DeepCollectionEquality().hash(eligibility),const DeepCollectionEquality().hash(nextDraw),const DeepCollectionEquality().hash(training),const DeepCollectionEquality().hash(solidarity),const DeepCollectionEquality().hash(alerts),const DeepCollectionEquality().hash(features));
 
 @override
 String toString() {
-  return 'Dashboard(generatedAt: $generatedAt, user: $user, wallet: $wallet, contribution: $contribution, eligibility: $eligibility, nextDraw: $nextDraw, training: $training, alerts: $alerts, features: $features)';
+  return 'Dashboard(generatedAt: $generatedAt, user: $user, wallet: $wallet, contribution: $contribution, eligibility: $eligibility, nextDraw: $nextDraw, training: $training, solidarity: $solidarity, alerts: $alerts, features: $features)';
 }
 
 
@@ -1190,7 +1190,7 @@ abstract mixin class $DashboardCopyWith<$Res>  {
   factory $DashboardCopyWith(Dashboard value, $Res Function(Dashboard) _then) = _$DashboardCopyWithImpl;
 @useResult
 $Res call({
- DateTime generatedAt, DashboardUser user, WalletSummary wallet, Map<String, dynamic>? contribution, Map<String, dynamic>? eligibility, Map<String, dynamic>? nextDraw, Map<String, dynamic>? training, List<DashboardAlert> alerts, Map<String, bool> features
+ DateTime generatedAt, DashboardUser user, WalletSummary wallet, Map<String, dynamic>? contribution, Map<String, dynamic>? eligibility, Map<String, dynamic>? nextDraw, Map<String, dynamic>? training, Map<String, dynamic>? solidarity, List<DashboardAlert> alerts, Map<String, bool> features
 });
 
 
@@ -1207,7 +1207,7 @@ class _$DashboardCopyWithImpl<$Res>
 
 /// Create a copy of Dashboard
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? generatedAt = null,Object? user = null,Object? wallet = null,Object? contribution = freezed,Object? eligibility = freezed,Object? nextDraw = freezed,Object? training = freezed,Object? alerts = null,Object? features = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? generatedAt = null,Object? user = null,Object? wallet = null,Object? contribution = freezed,Object? eligibility = freezed,Object? nextDraw = freezed,Object? training = freezed,Object? solidarity = freezed,Object? alerts = null,Object? features = null,}) {
   return _then(_self.copyWith(
 generatedAt: null == generatedAt ? _self.generatedAt : generatedAt // ignore: cast_nullable_to_non_nullable
 as DateTime,user: null == user ? _self.user : user // ignore: cast_nullable_to_non_nullable
@@ -1216,6 +1216,7 @@ as WalletSummary,contribution: freezed == contribution ? _self.contribution : co
 as Map<String, dynamic>?,eligibility: freezed == eligibility ? _self.eligibility : eligibility // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,nextDraw: freezed == nextDraw ? _self.nextDraw : nextDraw // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,training: freezed == training ? _self.training : training // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,solidarity: freezed == solidarity ? _self.solidarity : solidarity // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,alerts: null == alerts ? _self.alerts : alerts // ignore: cast_nullable_to_non_nullable
 as List<DashboardAlert>,features: null == features ? _self.features : features // ignore: cast_nullable_to_non_nullable
 as Map<String, bool>,
@@ -1321,10 +1322,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( DateTime generatedAt,  DashboardUser user,  WalletSummary wallet,  Map<String, dynamic>? contribution,  Map<String, dynamic>? eligibility,  Map<String, dynamic>? nextDraw,  Map<String, dynamic>? training,  List<DashboardAlert> alerts,  Map<String, bool> features)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( DateTime generatedAt,  DashboardUser user,  WalletSummary wallet,  Map<String, dynamic>? contribution,  Map<String, dynamic>? eligibility,  Map<String, dynamic>? nextDraw,  Map<String, dynamic>? training,  Map<String, dynamic>? solidarity,  List<DashboardAlert> alerts,  Map<String, bool> features)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Dashboard() when $default != null:
-return $default(_that.generatedAt,_that.user,_that.wallet,_that.contribution,_that.eligibility,_that.nextDraw,_that.training,_that.alerts,_that.features);case _:
+return $default(_that.generatedAt,_that.user,_that.wallet,_that.contribution,_that.eligibility,_that.nextDraw,_that.training,_that.solidarity,_that.alerts,_that.features);case _:
   return orElse();
 
 }
@@ -1342,10 +1343,10 @@ return $default(_that.generatedAt,_that.user,_that.wallet,_that.contribution,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( DateTime generatedAt,  DashboardUser user,  WalletSummary wallet,  Map<String, dynamic>? contribution,  Map<String, dynamic>? eligibility,  Map<String, dynamic>? nextDraw,  Map<String, dynamic>? training,  List<DashboardAlert> alerts,  Map<String, bool> features)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( DateTime generatedAt,  DashboardUser user,  WalletSummary wallet,  Map<String, dynamic>? contribution,  Map<String, dynamic>? eligibility,  Map<String, dynamic>? nextDraw,  Map<String, dynamic>? training,  Map<String, dynamic>? solidarity,  List<DashboardAlert> alerts,  Map<String, bool> features)  $default,) {final _that = this;
 switch (_that) {
 case _Dashboard():
-return $default(_that.generatedAt,_that.user,_that.wallet,_that.contribution,_that.eligibility,_that.nextDraw,_that.training,_that.alerts,_that.features);case _:
+return $default(_that.generatedAt,_that.user,_that.wallet,_that.contribution,_that.eligibility,_that.nextDraw,_that.training,_that.solidarity,_that.alerts,_that.features);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1362,10 +1363,10 @@ return $default(_that.generatedAt,_that.user,_that.wallet,_that.contribution,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( DateTime generatedAt,  DashboardUser user,  WalletSummary wallet,  Map<String, dynamic>? contribution,  Map<String, dynamic>? eligibility,  Map<String, dynamic>? nextDraw,  Map<String, dynamic>? training,  List<DashboardAlert> alerts,  Map<String, bool> features)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( DateTime generatedAt,  DashboardUser user,  WalletSummary wallet,  Map<String, dynamic>? contribution,  Map<String, dynamic>? eligibility,  Map<String, dynamic>? nextDraw,  Map<String, dynamic>? training,  Map<String, dynamic>? solidarity,  List<DashboardAlert> alerts,  Map<String, bool> features)?  $default,) {final _that = this;
 switch (_that) {
 case _Dashboard() when $default != null:
-return $default(_that.generatedAt,_that.user,_that.wallet,_that.contribution,_that.eligibility,_that.nextDraw,_that.training,_that.alerts,_that.features);case _:
+return $default(_that.generatedAt,_that.user,_that.wallet,_that.contribution,_that.eligibility,_that.nextDraw,_that.training,_that.solidarity,_that.alerts,_that.features);case _:
   return null;
 
 }
@@ -1377,7 +1378,7 @@ return $default(_that.generatedAt,_that.user,_that.wallet,_that.contribution,_th
 @JsonSerializable()
 
 class _Dashboard extends Dashboard {
-  const _Dashboard({required this.generatedAt, required this.user, required this.wallet, final  Map<String, dynamic>? contribution, final  Map<String, dynamic>? eligibility, final  Map<String, dynamic>? nextDraw, final  Map<String, dynamic>? training, required final  List<DashboardAlert> alerts, required final  Map<String, bool> features}): _contribution = contribution,_eligibility = eligibility,_nextDraw = nextDraw,_training = training,_alerts = alerts,_features = features,super._();
+  const _Dashboard({required this.generatedAt, required this.user, required this.wallet, final  Map<String, dynamic>? contribution, final  Map<String, dynamic>? eligibility, final  Map<String, dynamic>? nextDraw, final  Map<String, dynamic>? training, final  Map<String, dynamic>? solidarity, required final  List<DashboardAlert> alerts, required final  Map<String, bool> features}): _contribution = contribution,_eligibility = eligibility,_nextDraw = nextDraw,_training = training,_solidarity = solidarity,_alerts = alerts,_features = features,super._();
   factory _Dashboard.fromJson(Map<String, dynamic> json) => _$DashboardFromJson(json);
 
 @override final  DateTime generatedAt;
@@ -1419,6 +1420,15 @@ class _Dashboard extends Dashboard {
   return EqualUnmodifiableMapView(value);
 }
 
+ final  Map<String, dynamic>? _solidarity;
+@override Map<String, dynamic>? get solidarity {
+  final value = _solidarity;
+  if (value == null) return null;
+  if (_solidarity is EqualUnmodifiableMapView) return _solidarity;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(value);
+}
+
  final  List<DashboardAlert> _alerts;
 @override List<DashboardAlert> get alerts {
   if (_alerts is EqualUnmodifiableListView) return _alerts;
@@ -1447,16 +1457,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Dashboard&&(identical(other.generatedAt, generatedAt) || other.generatedAt == generatedAt)&&(identical(other.user, user) || other.user == user)&&(identical(other.wallet, wallet) || other.wallet == wallet)&&const DeepCollectionEquality().equals(other._contribution, _contribution)&&const DeepCollectionEquality().equals(other._eligibility, _eligibility)&&const DeepCollectionEquality().equals(other._nextDraw, _nextDraw)&&const DeepCollectionEquality().equals(other._training, _training)&&const DeepCollectionEquality().equals(other._alerts, _alerts)&&const DeepCollectionEquality().equals(other._features, _features));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Dashboard&&(identical(other.generatedAt, generatedAt) || other.generatedAt == generatedAt)&&(identical(other.user, user) || other.user == user)&&(identical(other.wallet, wallet) || other.wallet == wallet)&&const DeepCollectionEquality().equals(other._contribution, _contribution)&&const DeepCollectionEquality().equals(other._eligibility, _eligibility)&&const DeepCollectionEquality().equals(other._nextDraw, _nextDraw)&&const DeepCollectionEquality().equals(other._training, _training)&&const DeepCollectionEquality().equals(other._solidarity, _solidarity)&&const DeepCollectionEquality().equals(other._alerts, _alerts)&&const DeepCollectionEquality().equals(other._features, _features));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,generatedAt,user,wallet,const DeepCollectionEquality().hash(_contribution),const DeepCollectionEquality().hash(_eligibility),const DeepCollectionEquality().hash(_nextDraw),const DeepCollectionEquality().hash(_training),const DeepCollectionEquality().hash(_alerts),const DeepCollectionEquality().hash(_features));
+int get hashCode => Object.hash(runtimeType,generatedAt,user,wallet,const DeepCollectionEquality().hash(_contribution),const DeepCollectionEquality().hash(_eligibility),const DeepCollectionEquality().hash(_nextDraw),const DeepCollectionEquality().hash(_training),const DeepCollectionEquality().hash(_solidarity),const DeepCollectionEquality().hash(_alerts),const DeepCollectionEquality().hash(_features));
 
 @override
 String toString() {
-  return 'Dashboard(generatedAt: $generatedAt, user: $user, wallet: $wallet, contribution: $contribution, eligibility: $eligibility, nextDraw: $nextDraw, training: $training, alerts: $alerts, features: $features)';
+  return 'Dashboard(generatedAt: $generatedAt, user: $user, wallet: $wallet, contribution: $contribution, eligibility: $eligibility, nextDraw: $nextDraw, training: $training, solidarity: $solidarity, alerts: $alerts, features: $features)';
 }
 
 
@@ -1467,7 +1477,7 @@ abstract mixin class _$DashboardCopyWith<$Res> implements $DashboardCopyWith<$Re
   factory _$DashboardCopyWith(_Dashboard value, $Res Function(_Dashboard) _then) = __$DashboardCopyWithImpl;
 @override @useResult
 $Res call({
- DateTime generatedAt, DashboardUser user, WalletSummary wallet, Map<String, dynamic>? contribution, Map<String, dynamic>? eligibility, Map<String, dynamic>? nextDraw, Map<String, dynamic>? training, List<DashboardAlert> alerts, Map<String, bool> features
+ DateTime generatedAt, DashboardUser user, WalletSummary wallet, Map<String, dynamic>? contribution, Map<String, dynamic>? eligibility, Map<String, dynamic>? nextDraw, Map<String, dynamic>? training, Map<String, dynamic>? solidarity, List<DashboardAlert> alerts, Map<String, bool> features
 });
 
 
@@ -1484,7 +1494,7 @@ class __$DashboardCopyWithImpl<$Res>
 
 /// Create a copy of Dashboard
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? generatedAt = null,Object? user = null,Object? wallet = null,Object? contribution = freezed,Object? eligibility = freezed,Object? nextDraw = freezed,Object? training = freezed,Object? alerts = null,Object? features = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? generatedAt = null,Object? user = null,Object? wallet = null,Object? contribution = freezed,Object? eligibility = freezed,Object? nextDraw = freezed,Object? training = freezed,Object? solidarity = freezed,Object? alerts = null,Object? features = null,}) {
   return _then(_Dashboard(
 generatedAt: null == generatedAt ? _self.generatedAt : generatedAt // ignore: cast_nullable_to_non_nullable
 as DateTime,user: null == user ? _self.user : user // ignore: cast_nullable_to_non_nullable
@@ -1493,6 +1503,7 @@ as WalletSummary,contribution: freezed == contribution ? _self._contribution : c
 as Map<String, dynamic>?,eligibility: freezed == eligibility ? _self._eligibility : eligibility // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,nextDraw: freezed == nextDraw ? _self._nextDraw : nextDraw // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,training: freezed == training ? _self._training : training // ignore: cast_nullable_to_non_nullable
+as Map<String, dynamic>?,solidarity: freezed == solidarity ? _self._solidarity : solidarity // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>?,alerts: null == alerts ? _self._alerts : alerts // ignore: cast_nullable_to_non_nullable
 as List<DashboardAlert>,features: null == features ? _self._features : features // ignore: cast_nullable_to_non_nullable
 as Map<String, bool>,

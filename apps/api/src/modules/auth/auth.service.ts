@@ -1,12 +1,23 @@
+import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AppException } from '../../common/errors/app-exception';
 import type { AuthContext, RequestContext } from '../../common/request-context';
+import { AppConfig } from '../../config/app-config';
 import { PrismaService, Tx } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { MeView, UsersService } from '../users/users.service';
 import { WalletService } from '../wallet/wallet.service';
-import type { DeviceDto, LoginDto, OtpRequestDto, OtpVerifyDto, RefreshDto, RegisterDto } from './dto';
-import { OtpIssued, OtpService } from './otp.service';
+import type {
+  DeviceDto,
+  LoginDto,
+  OtpRequestDto,
+  OtpVerifyDto,
+  PinResetConfirmDto,
+  PinResetRequestDto,
+  RefreshDto,
+  RegisterDto,
+} from './dto';
+import { OTP_RESEND_COOLDOWN_SECONDS, OtpIssued, OtpService } from './otp.service';
 import { isWeakPin, PinService } from './pin.service';
 import { TokenPair, TokenService } from './token.service';
 
@@ -29,6 +40,7 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly wallets: WalletService,
     private readonly audit: AuditService,
+    private readonly config: AppConfig,
   ) {}
 
   /** Étape 1 : crée (ou reprend) un compte en attente de vérification et envoie un code OTP. */
@@ -196,6 +208,70 @@ export class AuthService {
     });
 
     return { tokens, user: await this.users.getMe(user.id) };
+  }
+
+  /**
+   * Code PIN oublié — étape 1. La réponse a la même forme que le numéro soit inscrit ou non :
+   * elle ne permet pas de savoir si un compte existe (le faux défi échouera simplement à la vérification).
+   */
+  async requestPinReset(dto: PinResetRequestDto): Promise<{ phone: string; otp: OtpIssued }> {
+    const user = await this.prisma.user.findUnique({ where: { phone: dto.phone }, select: { kind: true, status: true } });
+    if (!user || user.kind !== 'MEMBER' || user.status !== 'ACTIVE') {
+      const now = Date.now();
+      return {
+        phone: dto.phone,
+        otp: {
+          challengeId: randomUUID(),
+          expiresAt: new Date(now + this.config.otp.ttlSeconds * 1000),
+          resendAvailableAt: new Date(now + OTP_RESEND_COOLDOWN_SECONDS * 1000),
+        },
+      };
+    }
+    return { phone: dto.phone, otp: await this.otp.issue(dto.phone, 'PIN_RESET') };
+  }
+
+  /** Code PIN oublié — étape 2 : nouveau PIN, déverrouillage, fermeture de toutes les sessions puis nouvelle session. */
+  async confirmPinReset(dto: PinResetConfirmDto, ctx: RequestContext): Promise<AuthResult> {
+    if (isWeakPin(dto.newPin)) {
+      throw new AppException(HttpStatus.UNPROCESSABLE_ENTITY, 'PIN_TOO_WEAK', 'Ce code PIN est trop facile à deviner. Choisissez-en un autre.');
+    }
+    const { phone } = await this.otp.verify(dto.challengeId, dto.code, 'PIN_RESET');
+    const pinHash = await this.pins.hash(dto.newPin);
+
+    const { userId, tokens } = await this.prisma.$transaction(async (tx) => {
+      await this.otp.consume(tx, dto.challengeId);
+      const user = await tx.user.findUnique({ where: { phone } });
+      if (!user || user.kind !== 'MEMBER' || user.status !== 'ACTIVE') {
+        throw new AppException(HttpStatus.FORBIDDEN, 'ACCOUNT_NOT_ACTIVE', "Ce compte n'est pas actif. Contactez le support.");
+      }
+      const now = new Date();
+      await tx.user.update({
+        where: { id: user.id },
+        data: { pinHash, failedLoginCount: 0, lockedUntil: null, lastLoginAt: now },
+      });
+      const revoked = await tx.session.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: now, revokedReason: 'PIN_RESET' },
+      });
+      const deviceId = await this.upsertDevice(tx, user.id, dto.device);
+      const session = await this.tokens.issueSession(tx, { userId: user.id, kind: user.kind, deviceId }, ctx);
+      await this.audit.record(
+        {
+          action: 'auth.pin_reset.completed',
+          resourceType: 'user',
+          resourceId: user.id,
+          actorId: user.id,
+          actorType: 'MEMBER',
+          metadata: { revokedSessions: revoked.count, deviceId },
+        },
+        ctx,
+        tx,
+      );
+      const { sessionId: _sessionId, ...pair } = session;
+      return { userId: user.id, tokens: pair };
+    });
+
+    return { tokens, user: await this.users.getMe(userId) };
   }
 
   refresh(dto: RefreshDto, ctx: RequestContext): Promise<TokenPair> {

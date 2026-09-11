@@ -150,7 +150,7 @@ export class DrawsService {
   }
 
   /** Données d'audit publiques et vérification recalculée par le serveur. */
-  async audit(id: string) {
+  async auditReport(id: string) {
     const draw = await this.findOrThrow(id);
     if (draw.status === 'DRAFT' || draw.status === 'CANCELLED') {
       throw new AppException(HttpStatus.CONFLICT, 'DRAW_NOT_AUDITABLE', 'Ce tirage n’a pas encore de données d’audit.');

@@ -241,12 +241,25 @@ class _MainCard extends StatelessWidget {
         boxShadow: BShadow.raised,
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          const Text('Ma contribution', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600)),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: BSpace.x3, vertical: BSpace.x1),
-            decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(BRadius.pill)),
-            child: Text(badgeLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+        Row(children: [
+          const Expanded(
+            child: Text(
+              'Ma contribution',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: BSpace.x2),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: BSpace.x3, vertical: BSpace.x1),
+              decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(BRadius.pill)),
+              child: Text(
+                badgeLabel,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
+              ),
+            ),
           ),
         ]),
         const SizedBox(height: BSpace.x4),

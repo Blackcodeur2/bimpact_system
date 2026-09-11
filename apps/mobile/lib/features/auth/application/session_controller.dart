@@ -2,7 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/app_failure.dart';
 import '../../../core/providers.dart';
+import '../../../core/security/app_lock.dart';
 import '../../../core/storage/token_store.dart';
+import '../../../core/sync/sync_queue.dart';
 import '../domain/auth_models.dart';
 
 sealed class SessionState {
@@ -58,6 +60,7 @@ class SessionController extends Notifier<SessionState> {
           StoredTokens(accessToken: result.tokens.accessToken, refreshToken: result.tokens.refreshToken),
         );
     await ref.read(authRepositoryProvider).cacheMe(result.user);
+    ref.read(appLockProvider.notifier).unlock();
     state = SignedIn(result.user);
   }
 
@@ -89,5 +92,9 @@ class SessionController extends Notifier<SessionState> {
   Future<void> _clearLocalData() async {
     await ref.read(tokenStoreProvider).clear();
     await ref.read(localCacheProvider).clear();
+    await ref.read(syncQueueProvider.notifier).clearAll();
+    // Le déverrouillage biométrique était lié à la session fermée.
+    await ref.read(biometricPreferenceProvider.notifier).set(false);
+    ref.read(appLockProvider.notifier).unlock();
   }
 }

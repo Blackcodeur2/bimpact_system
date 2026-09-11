@@ -1,88 +1,94 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AccidentClaimStatus, AccidentSeverity } from '@prisma/client';
-import {
-  IsBoolean,
-  IsDateString,
-  IsEnum,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsPositive,
-  IsString,
-} from 'class-validator';
+import { AccidentClaimStatus, AccidentDocType, AccidentSeverity } from '@prisma/client';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsDate, IsEnum, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
+import { cleanMultiline, cleanText, toAmountString, XAF_AMOUNT_MESSAGE, XAF_AMOUNT_RE } from '../../common/dto-helpers';
+import { CursorQueryDto } from '../../common/pagination';
 
 export class ReportAccidentDto {
-  @ApiProperty({ example: '2026-09-10T14:30:00Z' })
-  @IsDateString()
-  date!: string;
+  @Type(() => Date)
+  @IsDate()
+  date: Date;
 
-  @ApiProperty({ example: 'Yaoundé, Carrefour Nlongkak' })
+  @Transform(cleanText)
   @IsString()
-  @IsNotEmpty()
-  location!: string;
+  @Length(3, 200)
+  location: string;
 
-  @ApiProperty({ enum: AccidentSeverity, default: AccidentSeverity.MODERATE })
   @IsEnum(AccidentSeverity)
-  severity!: AccidentSeverity;
+  severity: AccidentSeverity;
 
-  @ApiPropertyOptional({ default: false })
-  @IsBoolean()
   @IsOptional()
+  @IsBoolean()
   thirdPartyInvolved?: boolean;
 
-  @ApiPropertyOptional({ example: 'Hôpital Central de Yaoundé' })
-  @IsString()
   @IsOptional()
+  @Transform(cleanText)
+  @IsString()
+  @MaxLength(120)
   hospitalName?: string;
 
-  @ApiProperty({ example: 'Accrochage avec un taxi jaune lors d\'un ralentissement.' })
+  @Transform(cleanMultiline)
   @IsString()
-  @IsNotEmpty()
-  description!: string;
+  @Length(10, 2000)
+  description: string;
 
-  @ApiProperty({ example: 45000 })
-  @IsNumber()
-  @IsPositive()
-  requestedAmount!: number;
+  /** Estimation des frais en francs CFA entiers ; n'engage aucune prise en charge. */
+  @Transform(toAmountString)
+  @Matches(XAF_AMOUNT_RE, { message: XAF_AMOUNT_MESSAGE })
+  requestedAmount: string;
 }
 
-export class ApproveClaimDto {
-  @ApiPropertyOptional({ example: 40000, description: 'Montant approuvé (si différent du montant demandé)' })
-  @IsNumber()
-  @IsPositive()
+export class UploadClaimDocumentDto {
+  @IsEnum(AccidentDocType)
+  type: AccidentDocType;
+}
+
+export class ClaimMessageDto {
+  @Transform(cleanMultiline)
+  @IsString()
+  @Length(2, 1000)
+  message: string;
+}
+
+export class AdminClaimsQueryDto extends CursorQueryDto {
   @IsOptional()
-  approvedAmount?: number;
-
-  @ApiPropertyOptional({ example: 'Dossier validé après vérification médicale.' })
-  @IsString()
-  @IsOptional()
-  reviewNotes?: string;
-}
-
-export class RejectClaimDto {
-  @ApiProperty({ example: 'Dossier incomplet — factures manquantes.' })
-  @IsString()
-  @IsNotEmpty()
-  reviewNotes!: string;
-}
-
-export class SetInvestigatingDto {
-  @ApiPropertyOptional({ example: 'En attente du rapport de police.' })
-  @IsString()
-  @IsOptional()
-  reviewNotes?: string;
-}
-
-export class SetSolidarityAmountDto {
-  @ApiProperty({ example: 500, description: 'Montant minimum en XAF prélevé sur chaque membre lors d\'un accident validé' })
-  @IsNumber()
-  @IsPositive()
-  amount!: number;
-}
-
-export class ListClaimsQueryDto {
-  @ApiPropertyOptional({ enum: AccidentClaimStatus })
   @IsEnum(AccidentClaimStatus)
-  @IsOptional()
   status?: AccidentClaimStatus;
+}
+
+/** Motif visible par le membre. */
+export class ClaimReasonDto {
+  @Transform(cleanMultiline)
+  @IsString()
+  @Length(5, 500)
+  reason: string;
+}
+
+export class InvestigateClaimDto {
+  /** Note interne du comité, jamais montrée au membre. */
+  @IsOptional()
+  @Transform(cleanMultiline)
+  @IsString()
+  @MaxLength(1000)
+  internalNote?: string;
+}
+
+export class ApproveClaimDto extends ClaimReasonDto {
+  @Transform(toAmountString)
+  @Matches(XAF_AMOUNT_RE, { message: XAF_AMOUNT_MESSAGE })
+  approvedAmount: string;
+
+  @IsOptional()
+  @Transform(cleanMultiline)
+  @IsString()
+  @MaxLength(1000)
+  internalNote?: string;
+}
+
+export class CloseClaimDto {
+  @IsOptional()
+  @Transform(cleanMultiline)
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }

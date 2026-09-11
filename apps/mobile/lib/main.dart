@@ -9,6 +9,7 @@ import 'app.dart';
 import 'core/providers.dart';
 import 'core/storage/device_identity.dart';
 import 'core/storage/local_cache.dart';
+import 'core/sync/sync_queue.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +18,9 @@ Future<void> main() async {
 
   final preferences = await SharedPreferences.getInstance();
   final device = await DeviceIdentity.load();
-  final LocalCache cache = kIsWeb ? MemoryLocalCache() : DriftLocalCache(AppDatabase());
+  final database = kIsWeb ? null : AppDatabase();
+  final LocalCache cache = database == null ? MemoryLocalCache() : DriftLocalCache(database);
+  final PendingActionStore pendingActions = database == null ? MemoryPendingActionStore() : DriftPendingActionStore(database);
 
   runApp(
     ProviderScope(
@@ -25,6 +28,7 @@ Future<void> main() async {
         sharedPreferencesProvider.overrideWithValue(preferences),
         deviceIdentityProvider.overrideWithValue(device),
         localCacheProvider.overrideWithValue(cache),
+        pendingActionStoreProvider.overrideWithValue(pendingActions),
       ],
       child: const BenskinApp(),
     ),

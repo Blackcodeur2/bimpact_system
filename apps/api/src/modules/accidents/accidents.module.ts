@@ -1,19 +1,40 @@
-import { Body, Controller, Get, Module, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Authenticated, RequirePermissions } from '../../common/access/access.decorators';
-import { AuthContext, CurrentAuth, RequestContext, Ctx } from '../../common/request-context';
-import { LedgerModule } from '../ledger/ledger.module';
 import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Module,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { RequirePermissions } from '../../common/access/access.decorators';
+import { Idempotent } from '../../common/idempotency.interceptor';
+import { AuthContext, Ctx, CurrentAuth, RequestContext } from '../../common/request-context';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { SolidarityModule } from '../solidarity/solidarity.module';
+import type { UploadedFileLike } from '../storage/file-types';
+import { StorageModule } from '../storage/storage.module';
+import {
+  AdminClaimsQueryDto,
   ApproveClaimDto,
-  ListClaimsQueryDto,
-  RejectClaimDto,
+  ClaimMessageDto,
+  ClaimReasonDto,
+  CloseClaimDto,
+  InvestigateClaimDto,
   ReportAccidentDto,
-  SetInvestigatingDto,
-  SetSolidarityAmountDto,
+  UploadClaimDocumentDto,
 } from './accidents.dto';
 import { AccidentsService } from './accidents.service';
 
-// ─────────────────────── Contrôleur membre ───────────────────────
+const UPLOAD_HARD_LIMIT_BYTES = 20_000_000;
 
 @ApiTags('accidents')
 @ApiBearerAuth()
@@ -21,113 +42,114 @@ import { AccidentsService } from './accidents.service';
 export class AccidentsController {
   constructor(private readonly accidents: AccidentsService) {}
 
-  @Authenticated()
-  @Get('coverage')
-  @ApiOperation({ summary: 'Statut de couverture solidaire du membre connecté' })
-  coverage(@CurrentAuth() auth: AuthContext) {
-    return this.accidents.getCoverageStatus(auth.userId);
-  }
-
-  @Authenticated()
+  @RequirePermissions('accidents.read.self')
   @Get()
-  @ApiOperation({ summary: 'Liste des dossiers de sinistre du membre connecté' })
   list(@CurrentAuth() auth: AuthContext) {
-    return this.accidents.listClaims(auth.userId);
+    return this.accidents.listMine(auth.userId);
   }
 
-  @Authenticated()
-  @Get(':id')
-  @ApiOperation({ summary: 'Détail d\'un dossier de sinistre' })
-  get(@CurrentAuth() auth: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
-    return this.accidents.getClaim(id, auth.userId);
-  }
-
-  @Authenticated()
+  /** Déclaration ; l'en-tête Idempotency-Key permet de la renvoyer sans doublon après une coupure réseau. */
+  @RequirePermissions('accidents.report.self')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Idempotent()
   @Post()
-  @ApiOperation({ summary: 'Déclarer un accident' })
-  report(@CurrentAuth() auth: AuthContext, @Body() dto: ReportAccidentDto) {
-    return this.accidents.createClaim(dto, auth.userId);
+  report(@CurrentAuth() auth: AuthContext, @Body() dto: ReportAccidentDto, @Ctx() ctx: RequestContext) {
+    return this.accidents.report(auth.userId, dto, ctx);
+  }
+
+  @RequirePermissions('accidents.read.self')
+  @Get(':id')
+  get(@CurrentAuth() auth: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.accidents.getMine(id, auth.userId);
+  }
+
+  @RequirePermissions('accidents.report.self')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Post(':id/documents')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: UPLOAD_HARD_LIMIT_BYTES, files: 1, fields: 4 } }))
+  upload(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UploadClaimDocumentDto,
+    @UploadedFile() file: UploadedFileLike | undefined,
+    @Ctx() ctx: RequestContext,
+  ) {
+    return this.accidents.uploadDocument(id, auth.userId, dto.type, file, ctx);
+  }
+
+  @RequirePermissions('accidents.report.self')
+  @Post(':id/messages')
+  @HttpCode(HttpStatus.OK)
+  message(@CurrentAuth() auth: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ClaimMessageDto, @Ctx() ctx: RequestContext) {
+    return this.accidents.addMessage(id, auth.userId, dto, ctx);
   }
 }
 
-// ─────────────────────── Contrôleur admin back-office ───────────────────────
-
-@ApiTags('admin/accidents')
+@ApiTags('admin / accidents')
 @ApiBearerAuth()
 @Controller('admin/accidents')
-export class AccidentsAdminController {
+export class AdminAccidentsController {
   constructor(private readonly accidents: AccidentsService) {}
 
   @RequirePermissions('admin.accidents.read')
   @Get()
-  @ApiOperation({ summary: '[Admin] Liste tous les dossiers de sinistre' })
-  listAll(@Query() query: ListClaimsQueryDto) {
-    return this.accidents.listAllClaims(query.status);
-  }
-
-  @RequirePermissions('admin.accidents.read')
-  @Get('settings/solidarity-amount')
-  @ApiOperation({ summary: '[Admin] Montant configurable du prélèvement solidaire' })
-  getSolidarityAmount() {
-    return this.accidents.getSolidarityDebitAmount().then((amount) => ({ key: 'accidents.solidarity_debit_amount', amount, currency: 'XAF' }));
-  }
-
-  @RequirePermissions('admin.accidents.decide')
-  @Put('settings/solidarity-amount')
-  @ApiOperation({ summary: '[Admin] Configurer le montant du prélèvement solidaire minimum (XAF)' })
-  setSolidarityAmount(@Body() dto: SetSolidarityAmountDto, @CurrentAuth() auth: AuthContext) {
-    return this.accidents.setSolidarityDebitAmount(dto.amount, auth.userId).then(() => ({
-      key: 'accidents.solidarity_debit_amount',
-      amount: dto.amount,
-      currency: 'XAF',
-      updatedBy: auth.userId,
-    }));
+  list(@Query() query: AdminClaimsQueryDto) {
+    return this.accidents.adminList(query);
   }
 
   @RequirePermissions('admin.accidents.read')
   @Get(':id')
-  @ApiOperation({ summary: '[Admin] Détail d\'un dossier de sinistre' })
-  getAdmin(@Param('id', ParseUUIDPipe) id: string) {
-    return this.accidents.getClaimAdmin(id);
+  get(@Param('id', ParseUUIDPipe) id: string, @Ctx() ctx: RequestContext) {
+    return this.accidents.adminGet(id, ctx);
+  }
+
+  @RequirePermissions('admin.accidents.decide')
+  @Post(':id/request-documents')
+  @HttpCode(HttpStatus.OK)
+  requestDocuments(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ClaimReasonDto, @Ctx() ctx: RequestContext) {
+    return this.accidents.requestDocuments(id, dto, ctx);
   }
 
   @RequirePermissions('admin.accidents.decide')
   @Post(':id/investigate')
-  @ApiOperation({ summary: '[Admin] Marquer un dossier en cours d\'investigation' })
-  investigate(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SetInvestigatingDto) {
-    return this.accidents.setInvestigating(id, dto.reviewNotes);
+  @HttpCode(HttpStatus.OK)
+  investigate(@Param('id', ParseUUIDPipe) id: string, @Body() dto: InvestigateClaimDto, @Ctx() ctx: RequestContext) {
+    return this.accidents.investigate(id, dto, ctx);
   }
 
   @RequirePermissions('admin.accidents.decide')
   @Post(':id/approve')
-  @ApiOperation({
-    summary: '[Admin] Approuver un dossier — déclenche le prélèvement solidaire sur TOUS les membres actifs',
-  })
-  approve(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ApproveClaimDto,
-    @Ctx() ctx: RequestContext,
-  ) {
-    return this.accidents.approveClaim(id, dto, ctx);
+  @HttpCode(HttpStatus.OK)
+  approve(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ApproveClaimDto, @Ctx() ctx: RequestContext) {
+    return this.accidents.approve(id, dto, ctx);
+  }
+
+  @RequirePermissions('admin.accidents.decide')
+  @Post(':id/disburse')
+  @HttpCode(HttpStatus.OK)
+  disburse(@Param('id', ParseUUIDPipe) id: string, @Ctx() ctx: RequestContext) {
+    return this.accidents.disburse(id, ctx);
   }
 
   @RequirePermissions('admin.accidents.decide')
   @Post(':id/reject')
-  @ApiOperation({ summary: '[Admin] Rejeter un dossier de sinistre' })
-  reject(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: RejectClaimDto,
-    @Ctx() ctx: RequestContext,
-  ) {
-    return this.accidents.rejectClaim(id, dto.reviewNotes, ctx);
+  @HttpCode(HttpStatus.OK)
+  reject(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ClaimReasonDto, @Ctx() ctx: RequestContext) {
+    return this.accidents.reject(id, dto, ctx);
+  }
+
+  @RequirePermissions('admin.accidents.decide')
+  @Post(':id/close')
+  @HttpCode(HttpStatus.OK)
+  close(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CloseClaimDto, @Ctx() ctx: RequestContext) {
+    return this.accidents.close(id, dto, ctx);
   }
 }
 
-// ─────────────────────── Module ───────────────────────
-
 @Module({
-  imports: [LedgerModule],
-  controllers: [AccidentsController, AccidentsAdminController],
+  imports: [StorageModule, NotificationsModule, SolidarityModule],
+  controllers: [AccidentsController, AdminAccidentsController],
   providers: [AccidentsService],
   exports: [AccidentsService],
 })

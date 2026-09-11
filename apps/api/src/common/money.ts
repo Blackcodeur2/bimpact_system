@@ -18,6 +18,11 @@ export function money(amount: Prisma.Decimal | string | number, currency = 'XAF'
   return { amount: new Decimal(amount).toFixed(CURRENCY_DECIMALS[currency] ?? 2), currency };
 }
 
+/** Montant XAF dans un texte rédigé par le serveur (notification, règlement) : « 150 000 FCFA ». */
+export function formatXaf(amount: Prisma.Decimal | string | number): string {
+  return `${new Decimal(amount).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} FCFA`;
+}
+
 /** Parse un montant strictement positif respectant la précision de la devise. */
 export function parsePositiveAmount(value: Prisma.Decimal | string, currency: string): Prisma.Decimal {
   let amount: Prisma.Decimal;
