@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/format/money_format.dart';
 import '../../../core/network/app_failure.dart';
-import '../../../core/security/app_lock.dart';
+import '../../../core/security/biometric_controller.dart';
+import '../../../core/security/biometric_credential_store.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/fields.dart';
 import '../../../core/widgets/states.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../auth/application/session_controller.dart';
 import '../data/security_repository.dart';
 
 /// Profil & sécurité (cahier §7.24) : code PIN, déverrouillage biométrique, appareils connectés.
@@ -69,6 +71,7 @@ class _ChangePinCardState extends ConsumerState<_ChangePinCard> {
     setState(() => _saving = true);
     try {
       final revoked = await ref.read(securityRepositoryProvider).changePin(currentPin: _current.text, newPin: _next.text);
+      await ref.read(biometricCredentialStoreProvider).updatePin(_next.text);
       for (final controller in [_current, _next, _confirm]) {
         controller.clear();
       }
@@ -146,42 +149,101 @@ class _BiometricCard extends ConsumerWidget {
   const _BiometricCard();
 
   Future<void> _toggle(BuildContext context, WidgetRef ref, bool enable) async {
+    final bioNotifier = ref.read(biometricControllerProvider.notifier);
     if (!enable) {
-      await ref.read(biometricPreferenceProvider.notifier).set(false);
+      await bioNotifier.disable();
+      if (context.mounted) showSuccessSnackBar(context, 'Authentification par empreinte désactivée.');
       return;
     }
-    final authenticator = ref.read(biometricAuthenticatorProvider);
-    if (!await authenticator.isAvailable()) {
-      if (context.mounted) showErrorSnackBar(context, 'Aucune empreinte ou reconnaissance faciale n’est configurée sur ce téléphone.');
+
+    final bioState = ref.read(biometricControllerProvider);
+    if (!bioState.isAvailable) {
+      if (context.mounted) {
+        showErrorSnackBar(context, 'Aucun capteur biométrique actif ou configuré sur ce téléphone.');
+      }
       return;
     }
-    final confirmed = await authenticator.authenticate('Confirmez pour activer le déverrouillage biométrique');
-    if (confirmed) {
-      await ref.read(biometricPreferenceProvider.notifier).set(true);
-      if (context.mounted) showSuccessSnackBar(context, 'Déverrouillage biométrique activé sur cet appareil.');
+
+    final session = ref.read(sessionControllerProvider);
+    if (session is! SignedIn) return;
+
+    final pin = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final pinController = TextEditingController();
+        return AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.fingerprint_rounded, color: BColors.growth600),
+            SizedBox(width: BSpace.x2),
+            Text('Activer l’empreinte'),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Entrez votre code PIN à 6 chiffres pour valider l’association avec votre empreinte.'),
+              const SizedBox(height: BSpace.x4),
+              PinField(
+                controller: pinController,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (val) {
+                  if (val.length == 6) Navigator.pop(ctx, val);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+            FilledButton(
+              onPressed: () {
+                if (pinController.text.length == 6) {
+                  Navigator.pop(ctx, pinController.text);
+                }
+              },
+              child: const Text('Confirmer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (pin == null || pin.length != 6) return;
+
+    final enrolled = await bioNotifier.enroll(
+      phone: session.user.phone,
+      pin: pin,
+      firstName: session.user.profile.firstName,
+    );
+
+    if (context.mounted) {
+      if (enrolled) {
+        showSuccessSnackBar(context, 'Connexion par empreinte digitale activée avec succès.');
+      } else {
+        showErrorSnackBar(context, 'L’authentification biométrique a échoué ou a été annulée.');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final enabled = ref.watch(biometricPreferenceProvider);
+    final bioState = ref.watch(biometricControllerProvider);
+    final isAvailable = bioState.isAvailable;
+    final isEnrolled = bioState.isEnrolled;
+
     return Card(
-      child: FutureBuilder<bool>(
-        future: ref.read(biometricAuthenticatorProvider).isAvailable(),
-        builder: (context, snapshot) {
-          final available = snapshot.data ?? false;
-          return SwitchListTile(
-            secondary: const Icon(Icons.fingerprint_rounded, color: BColors.primary500),
-            title: const Text('Déverrouillage biométrique', style: TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text(
-              available
-                  ? 'Ouvrir l’application avec votre empreinte ou votre visage. Le code PIN reste demandé à la connexion.'
-                  : 'Non disponible sur cet appareil.',
-            ),
-            value: enabled && available,
-            onChanged: available ? (value) => _toggle(context, ref, value) : null,
-          );
-        },
+      child: SwitchListTile(
+        secondary: const Icon(Icons.fingerprint_rounded, color: BColors.growth600, size: 28),
+        title: const Text('Connexion par empreinte digitale', style: TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text(
+          !isAvailable
+              ? 'Non disponible ou aucune empreinte enregistrée dans les paramètres de votre téléphone.'
+              : (isEnrolled
+                  ? 'Activée. Vous pouvez vous connecter et déverrouiller l’application d’un simple toucher.'
+                  : 'Désactivée. Activez pour vous connecter rapidement sans retaper votre code PIN.'),
+        ),
+        value: isEnrolled && isAvailable,
+        onChanged: isAvailable ? (value) => _toggle(context, ref, value) : null,
       ),
     );
   }

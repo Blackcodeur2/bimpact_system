@@ -78,6 +78,7 @@ class PinField extends StatefulWidget {
     this.validator,
     this.textInputAction,
     this.onSubmitted,
+    this.autofocus = false,
   });
 
   final TextEditingController controller;
@@ -86,6 +87,7 @@ class PinField extends StatefulWidget {
   final FormFieldValidator<String>? validator;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
+  final bool autofocus;
 
   @override
   State<PinField> createState() => _PinFieldState();
@@ -98,6 +100,7 @@ class _PinFieldState extends State<PinField> {
   Widget build(BuildContext context) {
     return TextFormField(
       controller: widget.controller,
+      autofocus: widget.autofocus,
       obscureText: _obscured,
       obscuringCharacter: '•',
       keyboardType: TextInputType.number,

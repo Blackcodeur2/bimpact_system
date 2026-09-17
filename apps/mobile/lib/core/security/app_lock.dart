@@ -1,36 +1,28 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:local_auth/local_auth.dart';
 
 import '../providers.dart';
+import 'biometric_auth_service.dart';
 
 /// Empreinte ou reconnaissance faciale du téléphone (cahier §7.4, §7.24).
 /// Elle déverrouille une session déjà ouverte ; le code PIN reste l'accès de référence.
 class BiometricAuthenticator {
-  BiometricAuthenticator([LocalAuthentication? auth]) : _auth = auth ?? LocalAuthentication();
+  BiometricAuthenticator([BiometricAuthService? service])
+      : _service = service ?? BiometricAuthService();
 
-  final LocalAuthentication _auth;
+  final BiometricAuthService _service;
 
-  Future<bool> isAvailable() async {
-    if (kIsWeb) return false;
-    try {
-      return await _auth.isDeviceSupported() && await _auth.canCheckBiometrics;
-    } catch (_) {
-      return false;
-    }
-  }
+  Future<bool> isAvailable() => _service.isAvailable();
 
-  Future<bool> authenticate(String reason) async {
-    if (kIsWeb) return false;
-    try {
-      return await _auth.authenticate(localizedReason: reason, persistAcrossBackgrounding: true);
-    } catch (_) {
-      return false;
-    }
-  }
+  Future<bool> authenticate(String reason) => _service.authenticate(
+        reason: reason,
+        title: 'Déverrouillage de l’application',
+        hint: 'Scannez votre empreinte digitale',
+      );
 }
 
-final biometricAuthenticatorProvider = Provider<BiometricAuthenticator>((ref) => BiometricAuthenticator());
+final biometricAuthenticatorProvider = Provider<BiometricAuthenticator>((ref) {
+  return BiometricAuthenticator(ref.watch(biometricAuthServiceProvider));
+});
 
 /// Préférence propre à cet appareil ; effacée à la déconnexion.
 class BiometricPreference extends Notifier<bool> {
