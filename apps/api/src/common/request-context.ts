@@ -17,6 +17,8 @@ export interface AuthContext {
   kind: UserKind;
   roles: string[];
   permissions: ReadonlySet<string>;
+  /** Compte back-office avec mot de passe temporaire : seules les routes de compte restent accessibles. */
+  mustChangePassword: boolean;
 }
 
 export type AppRequest = Request & {

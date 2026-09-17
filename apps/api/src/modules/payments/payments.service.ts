@@ -317,6 +317,30 @@ export class PaymentsService implements OnModuleInit {
     }
   }
 
+  /** Back-office : réinterroge l'opérateur pour un paiement resté en attente (webhook perdu). */
+  async adminRefresh(id: string, ctx: RequestContext): Promise<PaymentIntentView> {
+    const intent = await this.prisma.paymentIntent.findUnique({ where: { id } });
+    if (!intent) throw notFound();
+    if (intent.status !== 'PENDING' || !intent.externalReference) {
+      throw new AppException(HttpStatus.CONFLICT, 'PAYMENT_NOT_PENDING', 'Seul un paiement en attente chez l’opérateur peut être réinterrogé.', {
+        status: intent.status,
+      });
+    }
+    await this.refreshFromProvider(intent);
+    const after = await this.prisma.paymentIntent.findUniqueOrThrow({ where: { id } });
+    await this.audit.record(
+      {
+        action: 'payment.intent.refreshed',
+        resourceType: 'payment_intent',
+        resourceId: id,
+        before: { status: intent.status },
+        after: { status: after.status },
+      },
+      ctx,
+    );
+    return this.toView(after);
+  }
+
   private async refreshFromProvider(intent: PaymentIntent): Promise<void> {
     const status = await this.provider.getStatus({
       externalReference: intent.externalReference!,
@@ -418,7 +442,7 @@ export class PaymentsService implements OnModuleInit {
     return transaction.id;
   }
 
-  private toView(intent: PaymentIntent): PaymentIntentView {
+  toView(intent: PaymentIntent): PaymentIntentView {
     return {
       id: intent.id,
       status: intent.status,

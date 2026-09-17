@@ -16,7 +16,7 @@ export function configureApp(app: INestApplication, config: AppConfig) {
   app.use(helmet());
   app.enableCors({
     origin: config.corsOrigins.length > 0 ? config.corsOrigins : false,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
     allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Request-Id'],
     exposedHeaders: ['X-Request-Id', 'Idempotent-Replayed'],
   });

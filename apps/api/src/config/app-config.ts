@@ -48,6 +48,7 @@ export class AppConfig {
       secret: this.get('JWT_ACCESS_SECRET'),
       accessTtlSeconds: this.get('JWT_ACCESS_TTL_SECONDS'),
       refreshTtlDays: this.get('JWT_REFRESH_TTL_DAYS'),
+      staffSessionTtlHours: this.get('STAFF_SESSION_TTL_HOURS'),
     };
   }
 

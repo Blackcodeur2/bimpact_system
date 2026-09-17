@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { LedgerService } from '../../src/modules/ledger/ledger.service';
+import { PasswordService } from '../../src/modules/auth/password.service';
 import { TokenService } from '../../src/modules/auth/token.service';
 import { RegisteredMember, TestContext, uniquePhone } from './app';
 
@@ -19,6 +20,32 @@ export async function staffToken(ctx: TestContext, roleCode: string): Promise<{ 
     ctx.app.get(TokenService).issueSession(tx, { userId: staff.id, kind: 'STAFF' }, {}),
   );
   return { token: session.accessToken, userId: staff.id };
+}
+
+export const STAFF_PASSWORD = 'Tchad-Lobe-Mandara-2026';
+
+/** Compte back-office connectable par e-mail et mot de passe (sans session ouverte). */
+export async function staffAccount(
+  ctx: TestContext,
+  roleCode: string,
+  options: { mustChangePassword?: boolean; password?: string } = {},
+): Promise<{ id: string; email: string; password: string }> {
+  const role = await ctx.prisma.role.findUniqueOrThrow({ where: { code: roleCode } });
+  const password = options.password ?? STAFF_PASSWORD;
+  const email = `agent.${randomUUID().slice(0, 8)}@benskin.test`;
+  const staff = await ctx.prisma.user.create({
+    data: {
+      phone: uniquePhone(),
+      email,
+      kind: 'STAFF',
+      status: 'ACTIVE',
+      passwordHash: await ctx.app.get(PasswordService).hash(password),
+      mustChangePassword: options.mustChangePassword ?? false,
+      profile: { create: { firstName: 'Agent', lastName: roleCode, city: 'Yaoundé' } },
+      roles: { create: { roleId: role.id } },
+    },
+  });
+  return { id: staff.id, email, password };
 }
 
 /** Identité vérifiée sans passer par le circuit KYC complet (couvert par kyc.e2e-spec). */

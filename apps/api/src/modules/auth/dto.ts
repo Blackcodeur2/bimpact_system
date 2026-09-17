@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   Equals,
+  IsEmail,
   IsIn,
   IsOptional,
   IsString,
@@ -123,6 +124,28 @@ export class PinResetConfirmDto {
   @ValidateNested()
   @Type(() => DeviceDto)
   device: DeviceDto;
+}
+
+/** Connexion back-office. Le mot de passe n'est pas contraint ici : la politique s'applique à sa création. */
+export class StaffLoginDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsEmail({}, { message: 'Adresse e-mail invalide.' })
+  @MaxLength(254)
+  email: string;
+
+  @IsString()
+  @Length(1, 128)
+  password: string;
+}
+
+export class ChangePasswordDto {
+  @IsString()
+  @Length(1, 128)
+  currentPassword: string;
+
+  @IsString()
+  @Length(1, 256)
+  newPassword: string;
 }
 
 export class ChangePinDto {

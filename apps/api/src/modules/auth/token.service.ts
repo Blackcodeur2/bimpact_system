@@ -47,13 +47,16 @@ export class TokenService {
     ctx: RequestContext,
   ): Promise<TokenPair & { sessionId: string }> {
     const refreshToken = randomBytes(48).toString('base64url');
+    // Sessions du back-office bien plus courtes que celles de l'application mobile.
+    const ttlMs =
+      params.kind === 'STAFF' ? this.config.jwt.staffSessionTtlHours * 3_600_000 : this.config.jwt.refreshTtlDays * 86_400_000;
     const session = await tx.session.create({
       data: {
         userId: params.userId,
         deviceId: params.deviceId,
         familyId: params.familyId ?? randomUUID(),
         refreshTokenHash: sha256Hex(refreshToken),
-        expiresAt: new Date(Date.now() + this.config.jwt.refreshTtlDays * 86_400_000),
+        expiresAt: new Date(Date.now() + ttlMs),
         ipHash: ctx.ipHash,
         userAgent: ctx.userAgent,
       },

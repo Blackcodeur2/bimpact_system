@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="BENSKIN IMPACT">
+  <!-- Marque recréée d'après la planche de design : dièse dynamique bleu / vert / orange -->
+  <rect x="30" y="8" width="18" height="104" rx="9" transform="skewX(-14)" fill="#0F6FB2"/>
+  <rect x="66" y="8" width="18" height="104" rx="9" transform="skewX(-14)" fill="#16A34A"/>
+  <rect x="6" y="36" width="104" height="17" rx="8.5" fill="#16A34A"/>
+  <rect x="2" y="68" width="100" height="17" rx="8.5" fill="#F59E0B"/>
+  <rect x="40" y="36" width="20" height="17" fill="#0F6FB2" transform="skewX(-14) translate(9 0)"/>
+</svg>

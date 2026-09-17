@@ -8,9 +8,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// DATABASE_URL sert à l'API (Supabase : pooler « Transaction », port 6543) ;
+// DIRECT_URL aux migrations, qui exigent une connexion directe (Supabase : port 5432). En local, les deux sont identiques.
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────── Identité ───────────────────────────────
@@ -47,6 +50,13 @@ model User {
   lockedUntil      DateTime?  @map("locked_until")
   phoneVerifiedAt  DateTime?  @map("phone_verified_at")
   lastLoginAt      DateTime?  @map("last_login_at")
+  /// Back-office uniquement : identifiant de connexion (toujours en minuscules).
+  email              String?   @unique
+  /// Back-office uniquement : Argon2id + pepper serveur, jamais le mot de passe en clair.
+  passwordHash       String?   @map("password_hash")
+  passwordChangedAt  DateTime? @map("password_changed_at")
+  /// Mot de passe temporaire : toute action du back-office est refusée tant qu'il n'a pas été remplacé.
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
   createdAt        DateTime   @default(now()) @map("created_at")
   updatedAt        DateTime   @updatedAt @map("updated_at")
   deletedAt        DateTime?  @map("deleted_at")
@@ -76,6 +86,8 @@ model User {
   supportTickets       SupportTicket[]
   ownedCompanies       Company[]
   companyMemberships   CompanyMember[]
+  staffNotes           MemberNote[]
+  riskCases            RiskCase[]
 
   @@index([status])
   @@index([createdAt])
@@ -758,15 +770,24 @@ enum LessonContentType {
   VIDEO
 }
 
+/// DRAFT : en préparation, invisible des membres. ARCHIVED : retiré du parcours, historique conservé.
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model CourseModule {
-  id              String   @id @default(uuid()) @db.Uuid
-  month           Int      @unique // 1 à 6
+  id              String       @id @default(uuid()) @db.Uuid
+  month           Int          @unique // 1 à 6
   title           String
   description     String
-  durationMinutes Int      @default(120) @map("duration_minutes")
-  order           Int      @default(1)
-  iconName        String?  @map("icon_name")
-  createdAt       DateTime @default(now()) @map("created_at")
+  durationMinutes Int          @default(120) @map("duration_minutes")
+  order           Int          @default(1)
+  iconName        String?      @map("icon_name")
+  status          CourseStatus @default(PUBLISHED)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at")
 
   lessons CourseLesson[]
   quizzes Quiz[]
@@ -1300,4 +1321,70 @@ model AnalyticsEvent {
 
   @@index([name, occurredAt])
   @@map("analytics_events")
+}
+
+// ─────────────────────────────── Back-office ───────────────────────────────
+
+/// Note interne de l'équipe sur un membre (cahier §8.2), jamais visible par le membre. Immuable (trigger).
+model MemberNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  body      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@map("member_notes")
+}
+
+enum RiskCaseStatus {
+  NEW
+  INVESTIGATING
+  ESCALATED
+  RESOLVED
+  FALSE_POSITIVE
+}
+
+/// Dossier de risque ouvert par l'équipe à partir d'un signal réel (cahier §8.14).
+model RiskCase {
+  id           String         @id @default(uuid()) @db.Uuid
+  reference    String         @unique // ex. RSK-2026-7K3QZP
+  userId       String         @map("user_id") @db.Uuid
+  /// SHARED_DEVICE, DUPLICATE_ID_DOCUMENT, REPEATED_LOCKOUTS, PAYMENT_FAILURES, MANUAL
+  signalType   String         @map("signal_type")
+  summary      String
+  status       RiskCaseStatus @default(NEW)
+  assignedToId String?        @map("assigned_to_id") @db.Uuid
+  createdById  String         @map("created_by_id") @db.Uuid
+  resolution   String?
+  closedAt     DateTime?      @map("closed_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  events RiskCaseEvent[]
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@map("risk_cases")
+}
+
+/// Chronologie d'un dossier de risque. Immuable (trigger).
+model RiskCaseEvent {
+  id         String          @id @default(uuid()) @db.Uuid
+  caseId     String          @map("case_id") @db.Uuid
+  /// OPENED, NOTE, ASSIGNED, STATUS_CHANGED
+  type       String
+  fromStatus RiskCaseStatus? @map("from_status")
+  toStatus   RiskCaseStatus? @map("to_status")
+  note       String?
+  actorId    String          @map("actor_id") @db.Uuid
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  riskCase RiskCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+
+  @@index([caseId, createdAt])
+  @@map("risk_case_events")
 }

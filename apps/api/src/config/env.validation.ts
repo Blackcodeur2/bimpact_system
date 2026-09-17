@@ -66,6 +66,13 @@ export class EnvironmentVariables {
   @Max(90)
   JWT_REFRESH_TTL_DAYS = 30;
 
+  /** Durée d'une session du back-office (renouvelée à chaque rafraîchissement). */
+  @Transform(toInt)
+  @IsInt()
+  @Min(1)
+  @Max(24)
+  STAFF_SESSION_TTL_HOURS = 12;
+
   @Transform(toInt)
   @IsInt()
   @Min(60)

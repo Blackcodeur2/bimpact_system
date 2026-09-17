@@ -64,6 +64,7 @@ export class JwtAuthGuard implements CanActivate {
           select: {
             status: true,
             kind: true,
+            mustChangePassword: true,
             roles: {
               select: {
                 role: {
@@ -87,7 +88,14 @@ export class JwtAuthGuard implements CanActivate {
     const permissions = new Set(
       session.user.roles.flatMap((r) => r.role.permissions.map((p) => p.permission.code)),
     );
-    return { userId: session.userId, sessionId: payload.sid, kind: session.user.kind, roles, permissions };
+    return {
+      userId: session.userId,
+      sessionId: payload.sid,
+      kind: session.user.kind,
+      roles,
+      permissions,
+      mustChangePassword: session.user.mustChangePassword,
+    };
   }
 }
 
@@ -113,6 +121,13 @@ export class AccessPolicyGuard implements CanActivate {
 
     const required = this.reflector.getAllAndOverride<string[] | undefined>(ACCESS_PERMISSIONS, targets);
     if (required?.length) {
+      if (req.auth.mustChangePassword) {
+        throw new AppException(
+          HttpStatus.FORBIDDEN,
+          'PASSWORD_CHANGE_REQUIRED',
+          'Remplacez votre mot de passe temporaire avant de continuer.',
+        );
+      }
       if (required.every((permission) => req.auth!.permissions.has(permission))) return true;
       throw new AppException(
         HttpStatus.FORBIDDEN,

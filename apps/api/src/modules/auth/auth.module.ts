@@ -12,6 +12,7 @@ import { WalletModule } from '../wallet/wallet.module';
 import { AccessPolicyGuard, JwtAuthGuard } from './auth.guards';
 import { AuthService } from './auth.service';
 import {
+  ChangePasswordDto,
   ChangePinDto,
   LoginDto,
   OtpRequestDto,
@@ -20,10 +21,13 @@ import {
   PinResetRequestDto,
   RefreshDto,
   RegisterDto,
+  StaffLoginDto,
 } from './dto';
 import { DevLogOtpSender, OTP_SENDER, OtpService, UnconfiguredOtpSender } from './otp.service';
+import { PasswordService } from './password.service';
 import { PinService } from './pin.service';
 import { SecurityService } from './security.service';
+import { StaffAuthService } from './staff-auth.service';
 import { TokenService } from './token.service';
 
 const PER_MINUTE = 60_000;
@@ -31,7 +35,19 @@ const PER_MINUTE = 60_000;
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly staffAuth: StaffAuthService,
+  ) {}
+
+  /** Back-office : e-mail + mot de passe. Les comptes membres ne peuvent pas l'utiliser (et inversement). */
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: PER_MINUTE } })
+  @Post('staff/login')
+  @HttpCode(HttpStatus.OK)
+  staffLogin(@Body() dto: StaffLoginDto, @Ctx() ctx: RequestContext) {
+    return this.staffAuth.login(dto, ctx);
+  }
 
   @Public()
   @Throttle({ default: { limit: 5, ttl: PER_MINUTE } })
@@ -126,6 +142,28 @@ export class SecurityController {
   }
 }
 
+/** Compte de l'agent connecté. Accessible même avec un mot de passe temporaire, pour pouvoir le remplacer. */
+@ApiTags('admin / compte')
+@ApiBearerAuth()
+@Controller('admin/me')
+export class AdminAccountController {
+  constructor(private readonly staffAuth: StaffAuthService) {}
+
+  @Authenticated()
+  @Get()
+  me(@CurrentAuth() auth: AuthContext) {
+    return this.staffAuth.me(auth.userId);
+  }
+
+  @Authenticated()
+  @Throttle({ default: { limit: 5, ttl: PER_MINUTE } })
+  @Post('password')
+  @HttpCode(HttpStatus.OK)
+  changePassword(@CurrentAuth() auth: AuthContext, @Body() dto: ChangePasswordDto, @Ctx() ctx: RequestContext) {
+    return this.staffAuth.changePassword(auth, dto, ctx);
+  }
+}
+
 @Module({
   imports: [
     UsersModule,
@@ -140,11 +178,13 @@ export class SecurityController {
       }),
     }),
   ],
-  controllers: [AuthController, SecurityController],
+  controllers: [AuthController, SecurityController, AdminAccountController],
   providers: [
     AuthService,
+    StaffAuthService,
     OtpService,
     PinService,
+    PasswordService,
     TokenService,
     SecurityService,
     {
@@ -157,6 +197,6 @@ export class SecurityController {
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: AccessPolicyGuard },
   ],
-  exports: [TokenService],
+  exports: [TokenService, PasswordService],
 })
 export class AuthModule {}

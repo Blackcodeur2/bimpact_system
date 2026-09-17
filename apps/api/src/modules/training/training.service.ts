@@ -301,7 +301,9 @@ export class TrainingService {
 
   private async moduleStates(userId: string): Promise<ModuleState[]> {
     const [modules, completed, best, passed] = await Promise.all([
+      // Seuls les modules publiés composent le parcours : brouillons et modules archivés restent invisibles.
       this.prisma.courseModule.findMany({
+        where: { status: 'PUBLISHED' },
         orderBy: [{ order: 'asc' }, { month: 'asc' }],
         include: { lessons: { select: { id: true } }, quizzes: { select: { id: true, title: true, passScore: true }, take: 1 } },
       }),

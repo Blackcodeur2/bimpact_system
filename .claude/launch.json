@@ -4,8 +4,14 @@
     {
       "name": "benskin-api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--dir", "C:\\Users\\blinksofttech\\Documents\\benskinimpact\\apps\\api", "start"],
+      "runtimeArgs": ["--dir", "C:\\Users\\blinksofttech\\Documents\\benskinimpact\\apps\\api", "start:dev"],
       "port": 3000
+    },
+    {
+      "name": "benskin-admin",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "C:\\Users\\blinksofttech\\Documents\\benskinimpact\\apps\\admin", "start"],
+      "port": 4200
     },
     {
       "name": "benskin-mobile-web",
