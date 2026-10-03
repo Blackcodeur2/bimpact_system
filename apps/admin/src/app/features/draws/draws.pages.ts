@@ -356,7 +356,7 @@ const STEPS = [
                       <dt>Gagnants</dt>
                       <dd>{{ d.winnerCount }}</dd>
                       <dt>Éligibilité</dt>
-                      <dd>Identité vérifiée, au moins {{ d.minPaidDays }} jours de contribution payés sur les {{ d.windowDays }} derniers jours, pas déjà bénéficiaire</dd>
+                      <dd>Identité vérifiée, au moins {{ d.minPaidDays }} jours de contribution payés sur les {{ d.windowDays }} derniers jours, frais d’entretien du système à jour (500 FCFA/mois), pas déjà bénéficiaire</dd>
                       <dt>Éligibles figés</dt>
                       <dd>{{ d.eligibleCount ?? '—' }}{{ d.snapshotAt ? ' le ' : '' }}{{ d.snapshotAt ? (d.snapshotAt | frDateTime) : '' }}</dd>
                     </dl>

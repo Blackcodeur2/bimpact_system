@@ -25,7 +25,8 @@ export interface DrawEligibility {
   paidDays: number;
   requiredDays: number;
   windowDays: number;
-  /** KYC_NOT_APPROVED, NOT_ENOUGH_CONTRIBUTIONS, ALREADY_BENEFICIARY */
+  maintenanceFeePaid: boolean;
+  /** KYC_NOT_APPROVED, NOT_ENOUGH_CONTRIBUTIONS, ALREADY_BENEFICIARY, MAINTENANCE_FEE_NOT_PAID */
   reasons: string[];
 }
 
@@ -68,18 +69,30 @@ export class DrawsService {
 
   async eligibilityFor(userId: string, rule: { minPaidDays: number; windowDays: number }, asOf = new Date()): Promise<DrawEligibility> {
     const today = localDay(asOf);
-    const [profile, beneficiary, paidDays] = await Promise.all([
+    const targetMonth = formatDay(asOf).slice(0, 7);
+    const [profile, beneficiary, paidDays, feePaid] = await Promise.all([
       this.prisma.profile.findUnique({ where: { userId }, select: { kycStatus: true } }),
       this.prisma.beneficiary.findUnique({ where: { userId }, select: { status: true } }),
       this.prisma.contribution.count({
         where: { userId, periodDate: { gte: addDays(today, -(rule.windowDays - 1)), lte: today } },
+      }),
+      this.prisma.systemMaintenanceFee.findUnique({
+        where: { userId_month: { userId, month: targetMonth } },
       }),
     ]);
     const reasons: string[] = [];
     if (profile?.kycStatus !== 'APPROVED') reasons.push('KYC_NOT_APPROVED');
     if (paidDays < rule.minPaidDays) reasons.push('NOT_ENOUGH_CONTRIBUTIONS');
     if (beneficiary && beneficiary.status !== 'WITHDRAWN') reasons.push('ALREADY_BENEFICIARY');
-    return { eligible: reasons.length === 0, paidDays, requiredDays: rule.minPaidDays, windowDays: rule.windowDays, reasons };
+    if (!feePaid) reasons.push('MAINTENANCE_FEE_NOT_PAID');
+    return {
+      eligible: reasons.length === 0,
+      paidDays,
+      requiredDays: rule.minPaidDays,
+      windowDays: rule.windowDays,
+      maintenanceFeePaid: Boolean(feePaid),
+      reasons,
+    };
   }
 
   async nextForMember(userId: string) {
@@ -276,10 +289,12 @@ export class DrawsService {
 
         const today = localDay(asOf);
         const from = addDays(today, -(current.windowDays - 1));
+        const targetMonth = formatDay(asOf).slice(0, 7);
         const eligible = await tx.$queryRaw<{ user_id: string; paid_days: number }[]>`
           SELECT c.user_id::text AS user_id, COUNT(*)::int AS paid_days
           FROM contributions c
           JOIN profiles p ON p.user_id = c.user_id AND p.kyc_status = 'APPROVED'
+          JOIN system_maintenance_fees smf ON smf.user_id = c.user_id AND smf.month = ${targetMonth}
           LEFT JOIN beneficiaries b ON b.user_id = c.user_id AND b.status <> 'WITHDRAWN'
           WHERE c.period_date BETWEEN ${formatDay(from)}::date AND ${formatDay(today)}::date
             AND b.id IS NULL

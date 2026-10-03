@@ -9,6 +9,8 @@ import type { UpdateMeDto } from './users.dto';
 export interface MeView {
   id: string;
   phone: string;
+  email: string | null;
+  username: string | null;
   kind: UserKind;
   status: UserStatus;
   createdAt: Date;
@@ -45,6 +47,8 @@ export class UsersService {
     return {
       id: user.id,
       phone: user.phone,
+      email: user.email ?? null,
+      username: user.username ?? null,
       kind: user.kind,
       status: user.status,
       createdAt: user.createdAt,

@@ -43,6 +43,8 @@ export class PhoneDto {
   phone: string;
 }
 
+export const USERNAME_RE = /^[a-zA-Z0-9._-]{3,30}$/;
+
 export class RegisterDto extends PhoneDto {
   @Transform(cleanText)
   @IsString()
@@ -64,6 +66,21 @@ export class RegisterDto extends PhoneDto {
   @IsString()
   @MaxLength(60)
   zone?: string;
+
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsEmail({}, { message: 'Adresse e-mail invalide.' })
+  @MaxLength(254)
+  email: string;
+
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @Matches(USERNAME_RE, {
+    message: "Le nom d'utilisateur doit contenir 3 à 30 caractères (lettres, chiffres, tirets, underscores ou points).",
+  })
+  username: string;
+
+  @IsString()
+  @Length(8, 128, { message: 'Le mot de passe doit contenir au moins 8 caractères.' })
+  password: string;
 
   @Matches(PIN_RE, { message: 'Le code PIN doit contenir exactement 6 chiffres.' })
   pin: string;
@@ -92,9 +109,27 @@ export class OtpVerifyDto {
   device: DeviceDto;
 }
 
-export class LoginDto extends PhoneDto {
-  @Matches(PIN_RE, { message: 'Le code PIN doit contenir exactement 6 chiffres.' })
-  pin: string;
+export class LoginDto {
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  pin?: string;
+
+  @Transform(({ value, obj }) => {
+    const raw = value ?? obj?.phone;
+    return typeof raw === 'string' ? raw.trim().toLowerCase() : raw;
+  })
+  @IsString()
+  @Length(3, 254, { message: "L'identifiant doit contenir au moins 3 caractères." })
+  identifier: string;
+
+  @Transform(({ value, obj }) => value ?? obj?.pin)
+  @IsString()
+  @Length(1, 128, { message: 'Le mot de passe est obligatoire.' })
+  password: string;
 
   @ValidateNested()
   @Type(() => DeviceDto)

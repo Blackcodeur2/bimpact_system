@@ -41,6 +41,12 @@ interface DriverDetail {
     totalCount: number;
     totalAmount: Money;
   };
+  maintenanceFee?: {
+    month: string;
+    isPaid: boolean;
+    amount: Money;
+    paidAt: string | null;
+  };
   program: {
     beneficiary: { id: string; status: string; mentorName: string | null; selectedAt: string; draw: { id: string; code: string; title: string } } | null;
     completedLessons: number;
@@ -222,6 +228,24 @@ interface DriverDetail {
                           {{ plan.startedOn | frDate }}
                         } @else {
                           Aucun plan
+                        }
+                      </dd>
+                      <dt>Frais d'entretien</dt>
+                      <dd>
+                        @if (d.maintenanceFee; as fee) {
+                          @if (fee.isPaid) {
+                            <bi-badge tone="success">À jour ({{ fee.amount | xaf }})</bi-badge>
+                            · mois de {{ fee.month }}
+                          } @else {
+                            <bi-badge tone="danger">Non réglé ({{ fee.amount | xaf }}) — Inéligible au tirage</bi-badge>
+                            @if (auth.can('admin.drivers.update_status')) {
+                              <button type="button" class="btn btn-sm btn-secondary" style="margin-left: 8px; padding: 2px 8px; font-size: 12px;" (click)="maintenanceFeeDialog.open()">
+                                Encaisser / Régler
+                              </button>
+                            }
+                          }
+                        } @else {
+                          <bi-badge tone="neutral">Non configuré</bi-badge>
                         }
                       </dd>
                       <dt>Bénéficiaire</dt>
@@ -475,6 +499,25 @@ interface DriverDetail {
           </select>
         </div>
       </bi-action-dialog>
+      <bi-action-dialog
+        #maintenanceFeeDialog
+        title="Régler les frais d’entretien mensuels"
+        message="Les frais d’entretien mensuels (500 FCFA) permettent au conducteur d’être éligible aux tirages au sort."
+        confirmLabel="Confirmer le règlement"
+        tone="primary"
+        reasonLabel="Note ou référence facultative"
+        [busy]="action.busy()"
+        [error]="action.error()"
+        (confirmed)="payMaintenanceFee($event, maintenanceFeeDialog)"
+      >
+        <div class="field">
+          <label for="fee-source">Mode de règlement</label>
+          <select id="fee-source" name="feeSource" class="input" [ngModel]="feeSource()" (ngModelChange)="feeSource.set($event)">
+            <option value="WALLET">Débit du portefeuille (solde disponible)</option>
+            <option value="MANUAL">Règlement manuel (espèces / hors plateforme)</option>
+          </select>
+        </div>
+      </bi-action-dialog>
     </div>
   `,
 })
@@ -545,5 +588,23 @@ export class DriverDetailPage {
     dialog.close();
     this.toast.success('Dossier de risque ouvert.');
     void this.router.navigate(['/risque/dossiers', result.id]);
+  }
+
+  protected readonly feeSource = signal<'WALLET' | 'MANUAL'>('WALLET');
+
+  protected async payMaintenanceFee(reason: string, dialog: ActionDialogComponent): Promise<void> {
+    const d = this.data.value();
+    if (!d?.maintenanceFee) return;
+    const result = await this.action.run(() =>
+      this.api.post(`/admin/members/${this.id()}/maintenance-fees/pay`, {
+        month: d.maintenanceFee?.month,
+        source: this.feeSource(),
+        notes: reason || undefined,
+      }),
+    );
+    if (!result) return;
+    dialog.close();
+    void this.data.load();
+    this.toast.success(`Frais d’entretien (${d.maintenanceFee.month}) enregistrés avec succès.`);
   }
 }

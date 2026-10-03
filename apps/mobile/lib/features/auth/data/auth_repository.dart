@@ -19,6 +19,9 @@ class AuthRepository {
     required String firstName,
     required String lastName,
     required String city,
+    required String email,
+    required String username,
+    required String password,
     required String pin,
     required bool acceptTerms,
     required bool acceptPrivacy,
@@ -29,6 +32,9 @@ class AuthRepository {
         'firstName': firstName,
         'lastName': lastName,
         'city': city,
+        'email': email,
+        'username': username,
+        'password': password,
         'pin': pin,
         'acceptTerms': acceptTerms,
         'acceptPrivacy': acceptPrivacy,
@@ -55,9 +61,20 @@ class AuthRepository {
     );
   }
 
-  Future<AuthResult> login({required String phone, required String pin}) {
+  Future<AuthResult> login({
+    String? identifier,
+    String? password,
+    String? phone,
+    String? pin,
+  }) {
+    final effectiveId = identifier ?? phone ?? '';
+    final effectivePassword = password ?? pin ?? '';
     return client.call(
-      (dio) => dio.post('/auth/login', data: {'phone': phone, 'pin': pin, 'device': device.toJson()}),
+      (dio) => dio.post('/auth/login', data: {
+        'identifier': effectiveId,
+        'password': effectivePassword,
+        'device': device.toJson(),
+      }),
       (json) => AuthResult.fromJson(json as Map<String, dynamic>),
     );
   }

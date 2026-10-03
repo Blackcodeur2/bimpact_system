@@ -17,6 +17,7 @@ import { DrawsModule } from './modules/draws/draws.module';
 import { HealthModule } from './modules/health/health.module';
 import { KycModule } from './modules/kyc/kyc.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
+import { MaintenanceFeesModule } from './modules/maintenance-fees/maintenance-fees.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { PlatformModule } from './modules/platform/platform.module';
@@ -75,6 +76,7 @@ import { WalletModule } from './modules/wallet/wallet.module';
     SupportModule,
     StaffModule,
     BackofficeModule,
+    MaintenanceFeesModule,
   ],
 })
 export class AppModule implements NestModule {

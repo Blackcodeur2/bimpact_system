@@ -11,6 +11,8 @@ class BiometricCredentialStore {
   final FlutterSecureStorage _storage;
 
   static const _keyEnabled = 'biometric.enabled';
+  static const _keyIdentifier = 'biometric.identifier';
+  static const _keyPassword = 'biometric.password';
   static const _keyPhone = 'biometric.phone';
   static const _keyFirstName = 'biometric.first_name';
   static const _keyPin = 'biometric.pin';
@@ -18,12 +20,19 @@ class BiometricCredentialStore {
 
   /// Enregistre les identifiants nécessaires à la connexion par empreinte.
   Future<void> save({
-    required String phone,
-    required String pin,
+    String? identifier,
+    String? password,
+    String? phone,
+    String? pin,
     required String firstName,
   }) async {
-    await _storage.write(key: _keyPhone, value: phone);
-    await _storage.write(key: _keyPin, value: pin);
+    final effectiveId = identifier ?? phone ?? '';
+    final effectivePassword = password ?? pin ?? '';
+    await _storage.write(key: _keyIdentifier, value: effectiveId);
+    await _storage.write(key: _keyPassword, value: effectivePassword);
+    // Compatibilité rétroactive
+    await _storage.write(key: _keyPhone, value: effectiveId);
+    await _storage.write(key: _keyPin, value: effectivePassword);
     await _storage.write(key: _keyFirstName, value: firstName);
     await _storage.write(key: _keyEnabled, value: 'true');
     await _storage.write(key: _keyEnrolledAt, value: DateTime.now().toIso8601String());
@@ -33,27 +42,50 @@ class BiometricCredentialStore {
   Future<bool> isEnrolled() async {
     final enabled = await _storage.read(key: _keyEnabled);
     if (enabled != 'true') return false;
-    final phone = await _storage.read(key: _keyPhone);
-    final pin = await _storage.read(key: _keyPin);
-    return phone != null && phone.isNotEmpty && pin != null && pin.isNotEmpty;
+    final id = await getIdentifier();
+    final pwd = await getPassword();
+    return id != null && id.isNotEmpty && pwd != null && pwd.isNotEmpty;
   }
 
-  Future<String?> getPhone() => _storage.read(key: _keyPhone);
+  Future<String?> getIdentifier() async {
+    final id = await _storage.read(key: _keyIdentifier);
+    if (id != null && id.isNotEmpty) return id;
+    return _storage.read(key: _keyPhone);
+  }
+
+  Future<String?> getPassword() async {
+    final pwd = await _storage.read(key: _keyPassword);
+    if (pwd != null && pwd.isNotEmpty) return pwd;
+    return _storage.read(key: _keyPin);
+  }
+
+  Future<String?> getPhone() => getIdentifier();
 
   Future<String?> getFirstName() => _storage.read(key: _keyFirstName);
 
-  Future<String?> getPin() => _storage.read(key: _keyPin);
+  Future<String?> getPin() => getPassword();
+
+  /// Met à jour le mot de passe stocké en cas de changement par l'utilisateur.
+  Future<void> updatePassword(String newPassword) async {
+    if (await isEnrolled()) {
+      await _storage.write(key: _keyPassword, value: newPassword);
+      await _storage.write(key: _keyPin, value: newPassword);
+    }
+  }
 
   /// Met à jour le code PIN stocké en cas de changement par l'utilisateur.
   Future<void> updatePin(String newPin) async {
     if (await isEnrolled()) {
       await _storage.write(key: _keyPin, value: newPin);
+      await _storage.write(key: _keyPassword, value: newPin);
     }
   }
 
   /// Désactive et supprime définitivement les identifiants biométriques.
   Future<void> clear() async {
     await _storage.delete(key: _keyEnabled);
+    await _storage.delete(key: _keyIdentifier);
+    await _storage.delete(key: _keyPassword);
     await _storage.delete(key: _keyPhone);
     await _storage.delete(key: _keyFirstName);
     await _storage.delete(key: _keyPin);

@@ -4,7 +4,8 @@
 
 Plateforme numérique pour la communauté des conducteurs de motos-taxis : contribution programmée, portefeuille, tirages auditables, formation entrepreneuriale, projets, recrutement et solidarité encadrée.
 
-Spécification de référence : [`docs/product/sources/`](docs/product/sources/) (cahier des charges et planche de design).
+Spécification de référence : [`docs/product/sources/`](docs/product/sources/) (cahier des charges et planche de design).  
+Étude complète d'ingénierie et d'architecture : [`ETUDE_DU_PROJET.md`](ETUDE_DU_PROJET.md).
 
 ## Structure
 
@@ -60,17 +61,32 @@ pnpm api:dev
 
 API sur http://localhost:3000/v1 — documentation Swagger sur http://localhost:3000/docs en développement. En développement, les codes OTP sont écrits dans la console de l'API (`OTP_DEV_LOG=true`) au lieu d'être envoyés par SMS.
 
-Application mobile (émulateur Android, l'API locale est jointe via `10.0.2.2`) :
+### Application mobile (Flutter)
 
-```bash
-cd apps/mobile && flutter run
-```
+L'API de développement est accessible selon votre environnement :
 
-Application mobile dans le navigateur, avec rechargement à chaud automatique à chaque sauvegarde d'un fichier `.dart` (http://localhost:5173) :
+- **Sur téléphone physique (sans fil / Wi-Fi) :**
+  Assurez-vous que le port est ouvert sur votre machine hôte (`sudo ufw allow 3000/tcp`), puis :
+  ```bash
+  cd apps/mobile && flutter run
+  ```
+  *(Par défaut, l'application pointe sur `http://192.168.1.28:3000/v1`)*
 
-```bash
-pnpm mobile:dev
-```
+- **Sur téléphone physique (câble USB via ADB) :**
+  ```bash
+  adb reverse tcp:3000 tcp:3000
+  cd apps/mobile && flutter run --dart-define=API_BASE_URL=http://127.0.0.1:3000/v1
+  ```
+
+- **Sur émulateur Android :**
+  ```bash
+  cd apps/mobile && flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/v1
+  ```
+
+- **Dans le navigateur web** (avec rechargement à chaud automatique http://localhost:5173) :
+  ```bash
+  pnpm mobile:dev
+  ```
 
 ### Vérification d'identité (KYC) sans back-office
 

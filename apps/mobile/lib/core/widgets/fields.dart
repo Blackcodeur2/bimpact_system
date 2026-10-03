@@ -151,3 +151,63 @@ class OtpField extends StatelessWidget {
     );
   }
 }
+
+/// Saisie de mot de passe sécurisé avec visibilité commutable.
+class PasswordField extends StatefulWidget {
+  const PasswordField({
+    super.key,
+    required this.controller,
+    this.hintText = 'Mot de passe',
+    this.errorText,
+    this.validator,
+    this.textInputAction,
+    this.onSubmitted,
+    this.autofocus = false,
+  });
+
+  final TextEditingController controller;
+  final String hintText;
+  final String? errorText;
+  final FormFieldValidator<String>? validator;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+  final bool autofocus;
+
+  @override
+  State<PasswordField> createState() => _PasswordFieldState();
+}
+
+class _PasswordFieldState extends State<PasswordField> {
+  bool _obscured = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: widget.controller,
+      autofocus: widget.autofocus,
+      obscureText: _obscured,
+      keyboardType: TextInputType.visiblePassword,
+      textInputAction: widget.textInputAction ?? TextInputAction.next,
+      onFieldSubmitted: widget.onSubmitted,
+      enableSuggestions: false,
+      autocorrect: false,
+      decoration: InputDecoration(
+        hintText: widget.hintText,
+        errorText: widget.errorText,
+        prefixIcon: const Icon(Icons.lock_outline_rounded),
+        suffixIcon: IconButton(
+          tooltip: _obscured ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
+          icon: Icon(_obscured ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+          onPressed: () => setState(() => _obscured = !_obscured),
+        ),
+      ),
+      validator: widget.validator ??
+          (value) {
+            final text = (value ?? '').trim();
+            if (text.isEmpty) return 'Le mot de passe est obligatoire.';
+            if (text.length < 8) return 'Au moins 8 caractères.';
+            return null;
+          },
+    );
+  }
+}

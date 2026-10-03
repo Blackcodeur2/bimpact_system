@@ -50,9 +50,11 @@ model User {
   lockedUntil      DateTime?  @map("locked_until")
   phoneVerifiedAt  DateTime?  @map("phone_verified_at")
   lastLoginAt      DateTime?  @map("last_login_at")
-  /// Back-office uniquement : identifiant de connexion (toujours en minuscules).
+  /// Identifiant de connexion (e-mail, toujours en minuscules).
   email              String?   @unique
-  /// Back-office uniquement : Argon2id + pepper serveur, jamais le mot de passe en clair.
+  /// Identifiant alternatif (nom d'utilisateur, toujours en minuscules).
+  username           String?   @unique
+  /// Mot de passe (Argon2id + pepper serveur).
   passwordHash       String?   @map("password_hash")
   passwordChangedAt  DateTime? @map("password_changed_at")
   /// Mot de passe temporaire : toute action du back-office est refusée tant qu'il n'a pas été remplacé.
@@ -83,6 +85,7 @@ model User {
   accidentClaims       AccidentClaim[]
   jobApplications      JobApplication[]
   solidarityMembership SolidarityMembership?
+  systemMaintenanceFees SystemMaintenanceFee[]
   supportTickets       SupportTicket[]
   ownedCompanies       Company[]
   companyMemberships   CompanyMember[]
@@ -91,6 +94,7 @@ model User {
 
   @@index([status])
   @@index([createdAt])
+  @@index([username])
   @@map("users")
 }
 
@@ -629,6 +633,25 @@ model ContributionRun {
 
   @@unique([periodDate, kind])
   @@map("contribution_runs")
+}
+
+/// Frais d'entretien du système (500 FCFA/mois). Exigé pour l'éligibilité aux tirages.
+model SystemMaintenanceFee {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String   @map("user_id") @db.Uuid
+  /// Mois civil concerné au format YYYY-MM (ex. "2026-09").
+  month               String   @db.VarChar(7)
+  amount              Decimal  @db.Decimal(20, 2)
+  currency            String   @default("XAF") @db.Char(3)
+  paidAt              DateTime @default(now()) @map("paid_at")
+  ledgerTransactionId String?  @unique @map("ledger_transaction_id") @db.Uuid
+  notes               String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, month])
+  @@index([month])
+  @@map("system_maintenance_fees")
 }
 
 // ─────────────────────────────── Tirages et bénéficiaires ───────────────────────────────

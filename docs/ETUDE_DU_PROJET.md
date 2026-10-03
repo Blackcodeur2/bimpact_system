@@ -100,6 +100,12 @@ flowchart LR
 - **Gestion des sessions :**
   - Double jeton : *Access Token* JWT à durée courte (15 minutes) et *Refresh Token* opaque à durée longue (30 jours, rotatif).
   - Détection automatique de la réutilisation de jeton révoqué (alerte sécurité immédiate et invalidation de la famille de sessions).
+- **Authentification Biométrique (Empreinte Digitale) & Sécurité Matérielle :**
+  - **Détection matérielle :** Vérification native de la présence et de l'enrôlement de capteurs biométriques (empreinte digitale) sur le terminal via `local_auth`.
+  - **Coffre-fort local chiffré :** Conservation sécurisée des identifiants de session (numéro de téléphone, code PIN, prénom) dans le Keystore matériel Android / Secure Enclave via `flutter_secure_storage` (`BiometricCredentialStore`).
+  - **Verrouillage de l'application (*App Lock*) :** Protection automatique de l'accès à l'application par biométrie lors de la réouverture ou du passage en arrière-plan.
+  - **Parcours d'enrôlement fluide :** Proposition d'activation biométrique en un clic dès la première connexion réussie par code PIN, avec possibilité de bascule instantanée Empreinte ↔ PIN.
+  - **Gestion autonome & Sécurité renforcée :** Écran dédié dans les paramètres de sécurité permettant d'activer ou désactiver la biométrie (nécessite la saisie de confirmation du code PIN pour toute modification).
 
 ---
 
@@ -390,6 +396,13 @@ Le projet applique les normes de sécurité **OWASP ASVS** (sécurité des appli
   - Architecture par fonctionnalités (*feature-first*).
   - Gestion d'état avec Riverpod, navigation via GoRouter.
   - Couche réseau résiliente Dio avec rafraîchissement transparent du jeton.
+  - **Module d'authentification biométrique (Empreinte digitale) complet :**
+    - Service natif `local_auth` avec messages localisés en français.
+    - Stockage chiffré dans le Keystore Android (`BiometricCredentialStore`).
+    - Contrôleur d'état Riverpod (`BiometricController`) avec enrôlement post-login et bascule fluide PIN ↔ Biométrie.
+    - Écran de gestion de la sécurité biométrique avec confirmation par PIN.
+    - Suite de tests unitaires et de widgets automatisés (`biometric_auth_test.dart`) 100 % passants.
+  - **Compatibilité multi-environnement :** Support fluide des émulateurs Android, des tests physiques par câble USB (`adb reverse`) et par Wi-Fi local sans fil (`network_security_config.xml` configuré).
   - Moteur de base de données locale (Drift) et file de synchronisation hors ligne idempotente.
   - Écrans d'onboarding, authentification, dashboard, portefeuille, formation, déclarations.
 - **Composants Partagés (`packages/ui-tokens`) :**

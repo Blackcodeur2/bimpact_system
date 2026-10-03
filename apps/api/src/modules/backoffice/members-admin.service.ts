@@ -6,6 +6,7 @@ import { afterCursor, toPage } from '../../common/pagination';
 import type { RequestContext } from '../../common/request-context';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { formatDay } from '../contributions/contributions.rules';
 import { DAY_MS, fullName, requireActor, staffNames } from './backoffice.common';
 import type { MemberNoteDto, MembersQueryDto, MemberStatusDto } from './backoffice.dto';
 
@@ -119,6 +120,7 @@ export class MembersAdminService {
       notes,
       payments,
       riskCases,
+      maintenanceFeeThisMonth,
     ] = await Promise.all([
       this.prisma.ledgerAccount.findMany({ where: { ownerUserId: id }, select: { purpose: true, balance: true, currency: true } }),
       this.prisma.contribution.count({ where: { userId: id, paidAt: { gte: since } } }),
@@ -137,6 +139,9 @@ export class MembersAdminService {
         orderBy: { createdAt: 'desc' },
         take: 10,
         select: { id: true, reference: true, status: true, signalType: true, createdAt: true },
+      }),
+      this.prisma.systemMaintenanceFee.findUnique({
+        where: { userId_month: { userId: id, month: formatDay(now).slice(0, 7) } },
       }),
     ]);
     const authors = await staffNames(this.prisma, notes.map((note) => note.authorId));
@@ -174,6 +179,12 @@ export class MembersAdminService {
         paidDaysLast30,
         totalCount: contributionTotals._count,
         totalAmount: money(contributionTotals._sum.amount ?? 0),
+      },
+      maintenanceFee: {
+        month: formatDay(now).slice(0, 7),
+        isPaid: Boolean(maintenanceFeeThisMonth),
+        amount: money('500'),
+        paidAt: maintenanceFeeThisMonth?.paidAt ?? null,
       },
       program: {
         beneficiary: user.beneficiary

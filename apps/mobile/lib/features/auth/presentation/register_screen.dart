@@ -25,6 +25,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _firstName = TextEditingController();
   final _lastName = TextEditingController();
   final _city = TextEditingController();
+  final _email = TextEditingController();
+  final _username = TextEditingController();
+  final _password = TextEditingController();
+  final _passwordConfirm = TextEditingController();
   final _pin = TextEditingController();
   final _pinConfirm = TextEditingController();
   bool _acceptTerms = false;
@@ -36,7 +40,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   void dispose() {
-    for (final c in [_phone, _firstName, _lastName, _city, _pin, _pinConfirm]) {
+    for (final c in [
+      _phone,
+      _firstName,
+      _lastName,
+      _city,
+      _email,
+      _username,
+      _password,
+      _passwordConfirm,
+      _pin,
+      _pinConfirm,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -58,6 +73,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             firstName: _firstName.text.trim(),
             lastName: _lastName.text.trim(),
             city: _city.text.trim(),
+            email: _email.text.trim().toLowerCase(),
+            username: _username.text.trim().toLowerCase(),
+            password: _password.text,
             pin: _pin.text,
             acceptTerms: _acceptTerms,
             acceptPrivacy: _acceptPrivacy,
@@ -71,8 +89,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             if (_fieldErrors.isEmpty) _formError = failure.message;
           case 'PIN_TOO_WEAK':
             _fieldErrors = {'pin': failure.message};
+          case 'PASSWORD_TOO_WEAK':
+            _fieldErrors = {'password': failure.message};
           case 'PHONE_ALREADY_REGISTERED':
             _fieldErrors = {'phone': failure.message};
+          case 'EMAIL_ALREADY_REGISTERED':
+            _fieldErrors = {'email': failure.message};
+          case 'USERNAME_ALREADY_REGISTERED':
+            _fieldErrors = {'username': failure.message};
           default:
             _formError = failure.message;
         }
@@ -154,10 +178,73 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               validator: (v) => _required(v, 'Ville'),
             ),
             const SizedBox(height: BSpace.x4),
-            const FieldLabel('Code PIN (6 chiffres)'),
+            const FieldLabel('Nom d’utilisateur'),
+            TextFormField(
+              controller: _username,
+              textInputAction: TextInputAction.next,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: InputDecoration(
+                hintText: 'Ex. jean_237',
+                prefixIcon: const Icon(Icons.alternate_email_rounded),
+                errorText: _fieldErrors['username'],
+              ),
+              validator: (v) {
+                final text = (v ?? '').trim();
+                if (text.length < 3) return 'Le nom d’utilisateur doit comporter au moins 3 caractères.';
+                if (!RegExp(r'^[a-zA-Z0-9._-]+$').hasMatch(text)) {
+                  return 'Lettres, chiffres, tirets, underscores ou points uniquement.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: BSpace.x4),
+            const FieldLabel('Adresse e-mail'),
+            TextFormField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autocorrect: false,
+              autofillHints: const [AutofillHints.email],
+              decoration: InputDecoration(
+                hintText: 'Ex. jean.dupont@email.com',
+                prefixIcon: const Icon(Icons.email_outlined),
+                errorText: _fieldErrors['email'],
+              ),
+              validator: (v) {
+                final text = (v ?? '').trim();
+                if (text.isEmpty) return 'L’adresse e-mail est obligatoire.';
+                if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(text)) {
+                  return 'Entrez une adresse e-mail valide.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: BSpace.x4),
+            const FieldLabel('Mot de passe de connexion'),
+            PasswordField(
+              controller: _password,
+              textInputAction: TextInputAction.next,
+              errorText: _fieldErrors['password'],
+              validator: (v) {
+                final text = (v ?? '').trim();
+                if (text.length < 8) return 'Au moins 8 caractères.';
+                return null;
+              },
+            ),
+            const SizedBox(height: BSpace.x4),
+            const FieldLabel('Confirmez le mot de passe'),
+            PasswordField(
+              controller: _passwordConfirm,
+              hintText: 'Confirmer le mot de passe',
+              textInputAction: TextInputAction.next,
+              validator: (v) => v != _password.text ? 'Les deux mots de passe ne correspondent pas.' : null,
+            ),
+            const SizedBox(height: BSpace.x4),
+            const FieldLabel('Code PIN de transaction (6 chiffres)'),
             PinField(controller: _pin, errorText: _fieldErrors['pin']),
-            const SizedBox(height: BSpace.x2),
-            Text('Évitez les codes simples comme 123456 ou votre date de naissance.',
+            const SizedBox(height: BSpace.x1),
+            Text('Ce code PIN à 6 chiffres sécurisera vos retraits et opérations financières.',
                 style: text.bodySmall?.copyWith(color: BColors.textMuted)),
             const SizedBox(height: BSpace.x4),
             const FieldLabel('Confirmez le code PIN'),

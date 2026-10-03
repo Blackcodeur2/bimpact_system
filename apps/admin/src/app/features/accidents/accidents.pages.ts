@@ -115,8 +115,8 @@ interface ClaimDetail extends Omit<ClaimRow, 'documentsCount' | 'member'> {
               </div>
               <div class="card kpi">
                 <span class="kpi-label">Plafond d’aide</span>
-                <span class="kpi-value">{{ o.rules.maxAssistance | xaf }}</span>
-                <span class="kpi-sub">par dossier, dans la limite du fonds</span>
+                <span class="kpi-value">Sans plafond</span>
+                <span class="kpi-sub">selon décision du comité et limites du fonds</span>
               </div>
             </div>
           }
@@ -434,7 +434,7 @@ export class AccidentsPage implements OnInit {
         <div class="field">
           <label for="claim-amount">Montant accordé (FCFA)</label>
           <input id="claim-amount" name="approvedAmount" class="input" inputmode="numeric" [ngModel]="amount()" (ngModelChange)="amount.set($event)" />
-          <span class="hint">Montant entier, au plus égal au montant demandé et au plafond d’aide.</span>
+          <span class="hint">Montant entier, au plus égal au montant demandé.</span>
         </div>
         <div class="field">
           <label for="claim-approve-note">Note interne (facultatif)</label>
@@ -504,9 +504,7 @@ export class AccidentDetailPage {
   protected readonly amountValid = computed(() => /^[1-9]\d{0,8}$/.test(this.amount().trim()));
   protected readonly approveMessage = computed(() => {
     const d = this.data.value();
-    const cap = this.overview.value()?.rules.maxAssistance;
     const parts = [`Montant demandé : ${d ? formatMoney(d.requestedAmount) : '—'}`];
-    if (cap) parts.push(`plafond d’aide : ${formatMoney(cap)}`);
     const eligible = d?.solidarityEligible ? ' Si les collectes sont activées, le versement est lancé immédiatement.' : ' Le membre n’étant pas couvert, aucun versement solidaire ne sera effectué.';
     return `${parts.join(' · ')}.${eligible}`;
   });

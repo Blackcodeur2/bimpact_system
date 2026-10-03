@@ -37,6 +37,11 @@ interface SettingChange {
 
 const GROUPS = [
   {
+    prefix: 'system.',
+    title: 'Paramètres du système',
+    hint: 'Frais et règles globales de fonctionnement.',
+  },
+  {
     prefix: 'solidarity.',
     title: 'Fonds de solidarité volontaire',
     hint: 'N’activez les collectes qu’après validation juridique du dispositif.',
@@ -46,9 +51,10 @@ const GROUPS = [
 ];
 
 const SETTING_LABELS: Record<string, string> = {
+  'system.monthly_maintenance_fee': 'Frais mensuels d’entretien du système (exigés pour les tirages)',
   'solidarity.enabled': 'Collectes activées',
   'solidarity.contribution_amount': 'Participation par dossier approuvé',
-  'solidarity.max_assistance_amount': 'Plafond d’aide par dossier',
+  'solidarity.max_assistance_amount': 'Plafond d’aide par dossier (obsolète — sans plafond)',
   'solidarity.waiting_days': 'Délai de carence (jours)',
   'solidarity.rules_version': 'Version du règlement',
   'mobile.min_version': 'Version minimale exigée',

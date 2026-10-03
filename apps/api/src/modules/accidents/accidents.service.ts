@@ -274,15 +274,9 @@ export class AccidentsService {
 
   async approve(id: string, dto: ApproveClaimDto, ctx: RequestContext) {
     const approvedAmount = new Decimal(dto.approvedAmount);
-    const maxAssistance = await this.settings.amount('solidarity.max_assistance_amount');
     const claim = await this.transition(id, ['SUBMITTED', 'INVESTIGATING'], ctx, (current, actorId) => {
       if (approvedAmount.gt(current.requestedAmount)) {
         throw new AppException(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCIDENT_AMOUNT_ABOVE_REQUEST', 'Le montant accordé dépasse le montant demandé.');
-      }
-      if (approvedAmount.gt(maxAssistance)) {
-        throw new AppException(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCIDENT_AMOUNT_ABOVE_CAP', 'Le montant accordé dépasse le plafond d’aide.', {
-          maxAssistance: money(maxAssistance),
-        });
       }
       return {
         data: {

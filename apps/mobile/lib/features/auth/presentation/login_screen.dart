@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 
 import '../../../core/security/biometric_controller.dart';
 import '../../../core/widgets/biometric_button.dart';
-import '../../../core/format/phone_format.dart';
 import '../../../core/network/app_failure.dart';
 import '../../../core/providers.dart';
 import '../../../core/router/app_router.dart';
@@ -15,7 +14,7 @@ import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/fields.dart';
 import '../application/session_controller.dart';
 
-/// Connexion par téléphone + code PIN ou empreinte digitale (cahier §7.4).
+/// Connexion par e-mail / nom d'utilisateur + mot de passe ou empreinte digitale.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -25,12 +24,12 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _form = GlobalKey<FormState>();
-  final _phone = TextEditingController();
-  final _pin = TextEditingController();
+  final _identifier = TextEditingController();
+  final _password = TextEditingController();
   bool _submitting = false;
-  bool _showPinForm = false;
-  String? _phoneError;
-  String? _pinError;
+  bool _showManualForm = false;
+  String? _identifierError;
+  String? _passwordError;
   String? _formError;
 
   @override
@@ -46,8 +45,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ref.read(biometricControllerProvider.notifier).refresh().then((_) {
         if (!mounted) return;
         final bio = ref.read(biometricControllerProvider);
-        if (bio.enrolledPhone != null && _phone.text.isEmpty) {
-          _phone.text = CameroonPhone.pretty(bio.enrolledPhone!);
+        if (bio.enrolledPhone != null && _identifier.text.isEmpty) {
+          _identifier.text = bio.enrolledPhone!;
         }
       });
     });
@@ -55,8 +54,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   void dispose() {
-    _phone.dispose();
-    _pin.dispose();
+    _identifier.dispose();
+    _password.dispose();
     super.dispose();
   }
 
@@ -73,8 +72,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _promptBiometricEnrollment({
     required BuildContext context,
-    required String phone,
-    required String pin,
+    required String identifier,
+    required String password,
     required String firstName,
   }) async {
     final shouldEnroll = await showModalBottomSheet<bool>(
@@ -102,7 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const SizedBox(height: BSpace.x2),
               Text(
-                'Connectez-vous en un instant lors de vos prochaines visites sans avoir à retaper votre code PIN.',
+                'Connectez-vous en un instant lors de vos prochaines visites sans avoir à retaper votre mot de passe.',
                 textAlign: TextAlign.center,
                 style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: BColors.textMuted),
               ),
@@ -129,31 +128,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (shouldEnroll == true && mounted) {
       await ref.read(biometricControllerProvider.notifier).enroll(
-            phone: phone,
-            pin: pin,
+            identifier: identifier,
+            password: password,
             firstName: firstName,
           );
     }
   }
 
   Future<void> _submit() async {
-    setState(() => _phoneError = _pinError = _formError = null);
+    setState(() => _identifierError = _passwordError = _formError = null);
     if (!_form.currentState!.validate()) return;
 
     setState(() => _submitting = true);
     try {
-      final phoneE164 = CameroonPhone.toE164(_phone.text);
-      final pin = _pin.text;
+      final identifier = _identifier.text.trim();
+      final password = _password.text;
       final result = await ref
           .read(authRepositoryProvider)
-          .login(phone: phoneE164, pin: pin);
+          .login(identifier: identifier, password: password);
 
       final bioState = ref.read(biometricControllerProvider);
       if (bioState.isAvailable && !bioState.isEnrolled && mounted) {
         await _promptBiometricEnrollment(
           context: context,
-          phone: phoneE164,
-          pin: pin,
+          identifier: identifier,
+          password: password,
           firstName: result.user.profile.firstName,
         );
       }
@@ -175,7 +174,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       case 'INVALID_CREDENTIALS':
         final remaining = failure.details['remainingAttempts'];
         _formError = remaining is int
-            ? 'Numéro ou code PIN incorrect. $remaining ${plural(remaining, 'tentative')} ${plural(remaining, 'restante')}.'
+            ? 'Identifiant ou mot de passe incorrect. $remaining ${plural(remaining, 'tentative')} ${plural(remaining, 'restante')}.'
             : failure.message;
       case 'ACCOUNT_LOCKED':
         final until = DateTime.tryParse('${failure.details['lockedUntil']}');
@@ -183,22 +182,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ? failure.message
             : 'Trop de tentatives. Réessayez après ${DateFormat.Hm('fr').format(until.toLocal())}.';
       case 'VALIDATION_FAILED':
-        _phoneError = failure.fieldError('phone');
-        _pinError = failure.fieldError('pin');
-        if (_phoneError == null && _pinError == null) _formError = failure.message;
+        _identifierError = failure.fieldError('identifier');
+        _passwordError = failure.fieldError('password');
+        if (_identifierError == null && _passwordError == null) _formError = failure.message;
       default:
         _formError = failure.message;
     }
   }
 
-  void _forgotPin() => context.push(Routes.pinReset);
+  void _forgotPassword() => context.push(Routes.pinReset);
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final bioState = ref.watch(biometricControllerProvider);
     final canUseBiometrics = bioState.canLoginWithBiometrics;
-    final inBiometricMode = canUseBiometrics && !_showPinForm;
+    final inBiometricMode = canUseBiometrics && !_showManualForm;
 
     return Scaffold(
       backgroundColor: BColors.navy800,
@@ -250,7 +249,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                               ),
                               Text(
-                                CameroonPhone.pretty(bioState.enrolledPhone ?? ''),
+                                bioState.enrolledPhone ?? '',
                                 style: const TextStyle(color: BColors.textMuted, fontSize: 13),
                               ),
                             ]),
@@ -270,20 +269,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           minimumSize: const Size.fromHeight(48),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BRadius.md)),
                         ),
-                        onPressed: () => setState(() => _showPinForm = true),
-                        icon: const Icon(Icons.pin_outlined),
-                        label: const Text('Se connecter avec le code PIN'),
+                        onPressed: () => setState(() => _showManualForm = true),
+                        icon: const Icon(Icons.lock_outline_rounded),
+                        label: const Text('Se connecter avec le mot de passe'),
                       ),
                       const SizedBox(height: BSpace.x3),
                       TextButton(
                         onPressed: () {
                           setState(() {
-                            _showPinForm = true;
-                            _phone.clear();
-                            _pin.clear();
+                            _showManualForm = true;
+                            _identifier.clear();
+                            _password.clear();
                           });
                         },
-                        child: const Text('Se connecter avec un autre numéro'),
+                        child: const Text('Se connecter avec un autre compte'),
                       ),
                       const SizedBox(height: BSpace.x4),
                       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -297,22 +296,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                           Text('Connexion', style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
                           const SizedBox(height: BSpace.x1),
-                          Text('Entrez votre numéro et votre code PIN.',
+                          Text('Entrez votre identifiant et votre mot de passe.',
                               style: text.bodyMedium?.copyWith(color: BColors.textMuted)),
                           const SizedBox(height: BSpace.x6),
-                          const FieldLabel('Numéro de téléphone'),
-                          PhoneField(controller: _phone, errorText: _phoneError),
+                          const FieldLabel("E-mail ou nom d'utilisateur"),
+                          TextFormField(
+                            controller: _identifier,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.username, AutofillHints.email],
+                            decoration: InputDecoration(
+                              hintText: 'ex. nom@exemple.cm ou mon_pseudo',
+                              errorText: _identifierError,
+                              prefixIcon: const Icon(Icons.person_outline_rounded),
+                            ),
+                            validator: (v) =>
+                                (v == null || v.trim().length < 3) ? "Entrez un e-mail ou nom d'utilisateur valide." : null,
+                          ),
                           const SizedBox(height: BSpace.x4),
-                          const FieldLabel('Code PIN'),
-                          PinField(
-                            controller: _pin,
-                            errorText: _pinError,
+                          const FieldLabel('Mot de passe'),
+                          PasswordField(
+                            controller: _password,
+                            errorText: _passwordError,
                             textInputAction: TextInputAction.done,
                             onSubmitted: (_) => _submit(),
                           ),
                           Align(
                             alignment: Alignment.centerRight,
-                            child: TextButton(onPressed: _forgotPin, child: const Text('Code PIN oublié ?')),
+                            child: TextButton(onPressed: _forgotPassword, child: const Text('Mot de passe oublié ?')),
                           ),
                           if (_formError != null) ...[FormErrorBanner(_formError!), const SizedBox(height: BSpace.x4)],
                           LoadingButton(label: 'Se connecter', loading: _submitting, onPressed: _submit),
@@ -322,7 +333,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               outlined: true,
                               label: 'Revenir à la connexion par empreinte',
                               loading: bioState.isAuthenticating,
-                              onPressed: () => setState(() => _showPinForm = false),
+                              onPressed: () => setState(() => _showManualForm = false),
                             ),
                           ],
                           const SizedBox(height: BSpace.x4),

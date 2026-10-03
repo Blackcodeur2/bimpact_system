@@ -18,6 +18,8 @@ import type {
   RegisterDto,
 } from './dto';
 import { OTP_RESEND_COOLDOWN_SECONDS, OtpIssued, OtpService } from './otp.service';
+import { passwordIssues, PasswordService } from './password.service';
+import { normalizeCameroonPhone } from './phone';
 import { isWeakPin, PinService } from './pin.service';
 import { TokenPair, TokenService } from './token.service';
 
@@ -36,6 +38,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly otp: OtpService,
     private readonly pins: PinService,
+    private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
     private readonly users: UsersService,
     private readonly wallets: WalletService,
@@ -53,8 +56,25 @@ export class AuthService {
       );
     }
 
-    const existing = await this.prisma.user.findUnique({ where: { phone: dto.phone }, select: { id: true, status: true } });
-    if (existing && existing.status !== 'PENDING_VERIFICATION') {
+    const issues = passwordIssues(dto.password, {
+      email: dto.email,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+    });
+    if (issues.length > 0) {
+      throw new AppException(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'PASSWORD_TOO_WEAK',
+        issues[0],
+        { issues },
+      );
+    }
+
+    const email = dto.email.toLowerCase().trim();
+    const username = dto.username.toLowerCase().trim();
+
+    const existingPhone = await this.prisma.user.findUnique({ where: { phone: dto.phone }, select: { id: true, status: true } });
+    if (existingPhone && existingPhone.status !== 'PENDING_VERIFICATION') {
       throw new AppException(
         HttpStatus.CONFLICT,
         'PHONE_ALREADY_REGISTERED',
@@ -62,13 +82,37 @@ export class AuthService {
       );
     }
 
+    const existingEmail = await this.prisma.user.findUnique({ where: { email }, select: { id: true, status: true } });
+    if (existingEmail && existingEmail.id !== existingPhone?.id) {
+      throw new AppException(
+        HttpStatus.CONFLICT,
+        'EMAIL_ALREADY_REGISTERED',
+        'Cette adresse e-mail est déjà utilisée.',
+      );
+    }
+
+    const existingUsername = await this.prisma.user.findUnique({ where: { username }, select: { id: true, status: true } });
+    if (existingUsername && existingUsername.id !== existingPhone?.id) {
+      throw new AppException(
+        HttpStatus.CONFLICT,
+        'USERNAME_ALREADY_REGISTERED',
+        "Ce nom d'utilisateur est déjà pris.",
+      );
+    }
+
     const pinHash = await this.pins.hash(dto.pin);
+    const passwordHash = await this.passwords.hash(dto.password);
     const profile = { firstName: dto.firstName, lastName: dto.lastName, city: dto.city, zone: dto.zone ?? null };
 
     await this.prisma.$transaction(async (tx) => {
-      const user = existing
-        ? await tx.user.update({ where: { id: existing.id }, data: { pinHash, profile: { update: profile } } })
-        : await tx.user.create({ data: { phone: dto.phone, pinHash, profile: { create: profile } } });
+      const user = existingPhone
+        ? await tx.user.update({
+            where: { id: existingPhone.id },
+            data: { email, username, passwordHash, pinHash, profile: { update: profile } },
+          })
+        : await tx.user.create({
+            data: { phone: dto.phone, email, username, passwordHash, pinHash, profile: { create: profile } },
+          });
 
       for (const type of ['TERMS', 'PRIVACY']) {
         await tx.consent.upsert({
@@ -79,12 +123,12 @@ export class AuthService {
       }
       await this.audit.record(
         {
-          action: existing ? 'auth.register.restarted' : 'auth.register.started',
+          action: existingPhone ? 'auth.register.restarted' : 'auth.register.started',
           resourceType: 'user',
           resourceId: user.id,
           actorId: user.id,
           actorType: 'MEMBER',
-          after: { ...profile, consentVersion: CONSENT_VERSION },
+          after: { ...profile, email, username, consentVersion: CONSENT_VERSION },
         },
         ctx,
         tx,
@@ -140,18 +184,36 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, ctx: RequestContext): Promise<AuthResult> {
-    const user = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
+    const id = dto.identifier.toLowerCase().trim();
+    const normalizedPhone = normalizeCameroonPhone(dto.identifier);
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: id },
+          { username: id },
+          ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
+          { phone: id },
+        ],
+      },
+    });
 
-    // Les comptes back-office passeront par une connexion avec MFA (phase back-office).
-    if (!user || !user.pinHash || user.kind !== 'MEMBER' || user.status === 'CLOSED') {
-      await this.pins.burn(dto.pin);
+    // Les comptes back-office passent par leur propre route d'authentification.
+    if (!user || (!user.passwordHash && !user.pinHash) || user.kind !== 'MEMBER' || user.status === 'CLOSED') {
+      await this.passwords.burn(dto.password);
       throw invalidCredentials();
     }
     if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
       throw accountLocked(user.lockedUntil);
     }
 
-    if (!(await this.pins.verify(user.pinHash, dto.pin))) {
+    const passwordMatch = user.passwordHash
+      ? await this.passwords.verify(user.passwordHash, dto.password)
+      : false;
+    const pinMatch = (!passwordMatch && user.pinHash)
+      ? await this.pins.verify(user.pinHash, dto.password)
+      : false;
+
+    if (!passwordMatch && !pinMatch) {
       const { failedLoginCount } = await this.prisma.user.update({
         where: { id: user.id },
         data: { failedLoginCount: { increment: 1 } },
@@ -303,7 +365,7 @@ function invalidCredentials(remainingAttempts?: number) {
   return new AppException(
     HttpStatus.UNAUTHORIZED,
     'INVALID_CREDENTIALS',
-    'Numéro ou code PIN incorrect.',
+    'Identifiant ou mot de passe incorrect.',
     remainingAttempts === undefined ? {} : { remainingAttempts },
   );
 }

@@ -78,11 +78,16 @@ class BiometricController extends StateNotifier<BiometricState> {
 
   /// Active la connexion par empreinte digitale pour l'utilisateur connecté.
   Future<bool> enroll({
-    required String phone,
-    required String pin,
+    String? identifier,
+    String? password,
+    String? phone,
+    String? pin,
     required String firstName,
   }) async {
     if (!state.isAvailable) return false;
+
+    final effectiveId = identifier ?? phone ?? '';
+    final effectivePassword = password ?? pin ?? '';
 
     state = state.copyWith(isAuthenticating: true, lastError: null);
     try {
@@ -98,8 +103,8 @@ class BiometricController extends StateNotifier<BiometricState> {
       }
 
       await _credentialStore.save(
-        phone: phone,
-        pin: pin,
+        identifier: effectiveId,
+        password: effectivePassword,
         firstName: firstName,
       );
       // Synchronise également le verrouillage d'application au premier plan
@@ -107,7 +112,7 @@ class BiometricController extends StateNotifier<BiometricState> {
 
       state = state.copyWith(
         isEnrolled: true,
-        enrolledPhone: phone,
+        enrolledPhone: effectiveId,
         enrolledFirstName: firstName,
         isAuthenticating: false,
       );
@@ -149,18 +154,18 @@ class BiometricController extends StateNotifier<BiometricState> {
         return false;
       }
 
-      final phone = await _credentialStore.getPhone();
-      final pin = await _credentialStore.getPin();
+      final identifier = await _credentialStore.getIdentifier();
+      final password = await _credentialStore.getPassword();
 
-      if (phone == null || pin == null) {
+      if (identifier == null || password == null) {
         state = state.copyWith(
           isAuthenticating: false,
-          lastError: 'Identifiants biométriques introuvables. Entrez votre code PIN.',
+          lastError: 'Identifiants biométriques introuvables. Entrez votre mot de passe.',
         );
         return false;
       }
 
-      final result = await ref.read(authRepositoryProvider).login(phone: phone, pin: pin);
+      final result = await ref.read(authRepositoryProvider).login(identifier: identifier, password: password);
       await ref.read(sessionControllerProvider.notifier).signIn(result);
 
       state = state.copyWith(isAuthenticating: false);
@@ -168,7 +173,7 @@ class BiometricController extends StateNotifier<BiometricState> {
     } catch (e) {
       state = state.copyWith(
         isAuthenticating: false,
-        lastError: 'Échec de la connexion biométrique. Veuillez utiliser votre code PIN.',
+        lastError: 'Échec de la connexion biométrique. Veuillez utiliser votre mot de passe.',
       );
       return false;
     }

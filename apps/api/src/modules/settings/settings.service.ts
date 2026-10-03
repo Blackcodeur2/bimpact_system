@@ -58,6 +58,11 @@ const definitions = {
     maxLength: 300,
     description: 'Message affiché pendant la maintenance.',
   },
+  'system.monthly_maintenance_fee': {
+    type: 'amount',
+    default: '500',
+    description: 'Frais mensuels d’entretien du système exigés pour participer aux tirages (FCFA).',
+  },
   'support.phone': { type: 'text', default: '', maxLength: 30, description: 'Numéro du support affiché dans l’application.' },
   'support.whatsapp': { type: 'text', default: '', maxLength: 30, description: 'Numéro WhatsApp du support.' },
   'support.email': { type: 'text', default: '', maxLength: 120, description: 'Adresse e-mail du support.' },
