@@ -5,6 +5,7 @@
   "description": "BENSKIN IMPACT — API NestJS",
   "scripts": {
     "build": "nest build",
+    "vercel-build": "prisma generate && nest build",
     "start": "node dist/main",
     "start:dev": "nest start --watch",
     "typecheck": "tsc --noEmit -p tsconfig.json",
